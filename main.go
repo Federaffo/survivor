@@ -64,8 +64,6 @@ func main() {
 	lastTime := rl.GetTime()
 
 	for !rl.WindowShouldClose() {
-		println(playerSize)
-		println(int32(w))
 		currentTime := rl.GetTime()
 		dt := currentTime - lastTime
 
@@ -96,7 +94,7 @@ func main() {
 		for _, p := range projList {
 			for _, e := range enemyList {
 
-				if rl.CheckCollisionCircles(p.pos, 2, e.pos, 10) {
+				if rl.CheckCollisionCircles(p.pos, projSize, e.pos, enemySize) {
 					e.DealDamage(p.damage)
 					if e.health <= 0 {
 						e.destroyed = true
