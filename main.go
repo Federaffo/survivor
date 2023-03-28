@@ -17,13 +17,15 @@ func main() {
 	var projList []*Projectile
 
 	for !rl.WindowShouldClose() {
-
 		player.Move()
+
+        mousePosition := rl.GetMousePosition()
+        player.LookAt(mousePosition)
 
 		//shoot
 		{
 			if rl.IsMouseButtonPressed(0) {
-				p := NewProj(player.pos, rl.GetMousePosition())
+				p := NewProj(player.Pos, mousePosition)
 				projList = append(projList, p)
 			}
 		}
@@ -35,18 +37,15 @@ func main() {
 
 		rl.BeginDrawing()
 		{
-
+			rl.ClearBackground(rl.Black)
 			for _, r := range projList {
 				r.Render()
 			}
 
-			rl.ClearBackground(rl.Black)
-			rl.DrawCircle(int32(player.pos.X), int32(player.pos.Y), 10, rl.Red)
+            player.Render()
 		}
 		rl.EndDrawing()
-
 	}
 
 	rl.CloseWindow()
-
 }
