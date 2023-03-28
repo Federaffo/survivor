@@ -1,22 +1,24 @@
 package main
 
-import rl "github.com/gen2brain/raylib-go/raylib"
+import (
+	rl "github.com/gen2brain/raylib-go/raylib"
+)
 
 var (
-	defaultDamage float32 = 10
-	projSpeed     float32 = 10
+	defaultDamage float32 = 100
+	projSpeed     float32 = 300
 )
 
 type Projectile struct {
-	damage float32
-	dir    rl.Vector2
-	pos    rl.Vector2
+	damage    float32
+	dir       rl.Vector2
+	pos       rl.Vector2
+	destroyed bool
 }
 
 func NewProj(initialPos rl.Vector2, direction rl.Vector2) *Projectile {
 	dir := rl.Vector2Subtract(direction, initialPos)
 	dir = rl.Vector2Normalize(dir)
-	dir = rl.Vector2Scale(dir, projSpeed)
 
 	return &Projectile{
 		damage: defaultDamage,
@@ -25,13 +27,19 @@ func NewProj(initialPos rl.Vector2, direction rl.Vector2) *Projectile {
 	}
 }
 
-func (p *Projectile) Update() {
-	p.pos = rl.Vector2Add(p.pos, p.dir)
+func (p *Projectile) Destroyed() bool {
+	return p.destroyed
+}
+
+func (p *Projectile) Update(dt float64) {
+	dtspeed := dt * float64(projSpeed)
+	dir := rl.Vector2Scale(p.dir, float32(dtspeed))
+	p.pos = rl.Vector2Add(p.pos, dir)
 
 	//p.hitbox.X = p.pos.X
 	//p.hitbox.Y = p.pos.Y
 }
 
 func (p *Projectile) Render() {
-	rl.DrawCircle(int32(p.pos.X), int32(p.pos.Y), 2, rl.Green)
+	rl.DrawCircle(int32(p.pos.X), int32(p.pos.Y), projSize, rl.Green)
 }
