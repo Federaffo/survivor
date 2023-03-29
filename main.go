@@ -39,11 +39,6 @@ func main() {
 	w := rl.GetMonitorWidth(display)
 	h := rl.GetMonitorHeight(display)
 
-	//have to be scaled based on screen size but it doesn't work :)
-	playerSize = 20
-	projSize = 3
-	enemySize = 18
-
 	rl.InitWindow(int32(w), int32(h), "Survivor")
 	rl.SetTargetFPS(60)
 
@@ -53,15 +48,18 @@ func main() {
 	var enemyList []*Enemy
 	var worldItems []WorldItem
 
-	e := NewEnemy(rl.NewVector2(10, 10), 100, 10)
-	enemyList = append(enemyList, e)
-	worldItems = append(worldItems, e)
-
-	e = NewEnemy(rl.NewVector2(100, 10), 100, 10)
-	enemyList = append(enemyList, e)
-	worldItems = append(worldItems, e)
-
 	lastTime := rl.GetTime()
+
+	lastSpawn := lastTime
+	spawnRate := 1
+
+	w = rl.GetMonitorWidth(display)
+	h = rl.GetMonitorHeight(display)
+
+	//have to be scaled based on screen size
+	playerSize = float32(w) / 150
+	projSize = float32(w) / 1000
+	enemySize = float32(w) / 200
 
 	for !rl.WindowShouldClose() {
 		currentTime := rl.GetTime()
@@ -78,6 +76,20 @@ func main() {
 				projList = append(projList, p)
 				worldItems = append(worldItems, p)
 
+			}
+		}
+
+		//Spwan enemys
+		{
+			if currentTime > lastSpawn+float64(spawnRate) {
+				lastSpawn = currentTime
+
+				x := rl.GetRandomValue(0, int32(w))
+				y := rl.GetRandomValue(0, int32(h))
+
+				e := NewEnemy(rl.NewVector2(float32(x), float32(y)), 100, 10)
+				enemyList = append(enemyList, e)
+				worldItems = append(worldItems, e)
 			}
 		}
 

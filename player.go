@@ -16,7 +16,7 @@ type player struct {
 }
 
 var (
-	playerSpeed float32 = 100
+	playerSpeed float32 = 200
 )
 
 func NewPlayer(totalHp int) player {

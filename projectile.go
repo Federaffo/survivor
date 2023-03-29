@@ -6,7 +6,7 @@ import (
 
 var (
 	defaultDamage float32 = 100
-	projSpeed     float32 = 300
+	projSpeed     float32 = 400
 )
 
 type Projectile struct {
