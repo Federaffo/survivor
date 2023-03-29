@@ -99,7 +99,31 @@ func main() {
 		}
 		// move enemy
 		for _, p := range enemyList {
-			p.Move(player.Pos, dt)
+
+			var dir rl.Vector2
+			collision := false
+
+			for _, pp := range enemyList {
+				if p.pos != pp.pos {
+
+					dtspeed := dt * float64(enemySpeed)
+
+					dir = rl.Vector2Subtract(player.Pos, p.pos)
+					dir = rl.Vector2Normalize(dir)
+					dir = rl.Vector2Scale(dir, float32(dtspeed))
+
+					if rl.CheckCollisionCircles(rl.Vector2Add(p.pos, dir), enemySize, pp.pos, enemySize) {
+						collision = true
+						break
+					}
+
+				}
+			}
+			if !collision {
+				//p.pos = rl.Vector2Add(p.pos, dir)
+				p.Move(player.Pos, dt)
+			}
+
 		}
 
 		//check collision between proj and enemy
