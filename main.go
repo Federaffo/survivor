@@ -12,7 +12,7 @@ var (
 
 type WorldItem interface {
 	Render()
-	//Update()
+	// Update()
 	Destroyed() bool
 }
 
@@ -51,12 +51,12 @@ func main() {
 	lastTime := rl.GetTime()
 
 	lastSpawn := lastTime
-	spawnRate := 1
+	spawnRate := 0.1
 
 	w = rl.GetMonitorWidth(display)
 	h = rl.GetMonitorHeight(display)
 
-	//have to be scaled based on screen size
+	// have to be scaled based on screen size
 	playerSize = float32(w) / 150
 	projSize = float32(w) / 1000
 	enemySize = float32(w) / 200
@@ -69,7 +69,7 @@ func main() {
 		player.LookAt(mousePosition)
 		player.Update(dt)
 
-		//shoot
+		// shoot
 		{
 			if rl.IsMouseButtonPressed(0) {
 				p := NewProj(player.Pos, mousePosition)
@@ -79,7 +79,7 @@ func main() {
 			}
 		}
 
-		//Spwan enemys
+		// Spwan enemys
 		{
 			if currentTime > lastSpawn+float64(spawnRate) {
 				lastSpawn = currentTime
@@ -98,38 +98,53 @@ func main() {
 			p.Update(dt)
 		}
 		// move enemy
+
 		for _, p := range enemyList {
-
-			var dir rl.Vector2
-			collision := false
-
-			for _, pp := range enemyList {
-				if p.pos != pp.pos {
-
-					dtspeed := dt * float64(enemySpeed)
-
-					dir = rl.Vector2Subtract(player.Pos, p.pos)
-					dir = rl.Vector2Normalize(dir)
-					dir = rl.Vector2Scale(dir, float32(dtspeed))
-
-					if rl.CheckCollisionCircles(rl.Vector2Add(p.pos, dir), enemySize, pp.pos, enemySize) {
-						collision = true
-						break
-					}
-
-				}
-			}
-			if !collision {
-				//p.pos = rl.Vector2Add(p.pos, dir)
-				p.Move(player.Pos, dt)
-			}
-
+			p.Move(player.Pos, dt)
 		}
 
-		//check collision between proj and enemy
+		type CollisionPair struct {
+			first  *Enemy
+			second *Enemy
+		}
+
+		anyColliding := true
+		for anyColliding {
+			anyColliding = false
+			collisions := []CollisionPair{}
+
+			for i, p := range enemyList {
+				var dir rl.Vector2
+				for j, pp := range enemyList {
+					if i != j {
+						dtspeed := dt * float64(enemySpeed)
+						dir = rl.Vector2Subtract(player.Pos, p.pos)
+						dir = rl.Vector2Normalize(dir)
+						dir = rl.Vector2Scale(dir, float32(dtspeed))
+
+						if rl.CheckCollisionCircles(p.pos, enemySize, pp.pos, enemySize) {
+							collisions = append(collisions, CollisionPair{p, pp})
+						}
+					}
+				}
+			}
+
+			anyColliding = len(collisions) > 0
+
+			for _, collision := range collisions {
+				// dist := rl.Vector2Distance(collision.first.pos, collision.second.pos)
+				// desiredDist := enemySize * 2
+				// diff := desiredDist - dist
+				pToColliding := rl.Vector2Scale(rl.Vector2Normalize(rl.Vector2Subtract(collision.second.pos, collision.first.pos)), 0.1)
+				collidingToP := rl.Vector2Scale(rl.Vector2Normalize(rl.Vector2Subtract(collision.first.pos, collision.second.pos)), 0.1)
+				collision.first.pos = rl.Vector2Add(collision.first.pos, collidingToP)
+				collision.second.pos = rl.Vector2Add(collision.second.pos, pToColliding)
+			}
+		}
+
+		// check collision between proj and enemy
 		for _, p := range projList {
 			for _, e := range enemyList {
-
 				if rl.CheckCollisionCircles(p.pos, projSize, e.pos, enemySize) {
 					e.DealDamage(p.damage)
 					if e.health <= 0 {
