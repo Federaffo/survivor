@@ -114,14 +114,8 @@ func main() {
 			collisions := []CollisionPair{}
 
 			for i, p := range enemyList {
-				var dir rl.Vector2
 				for j, pp := range enemyList {
 					if i != j {
-						dtspeed := dt * float64(enemySpeed)
-						dir = rl.Vector2Subtract(player.Pos, p.pos)
-						dir = rl.Vector2Normalize(dir)
-						dir = rl.Vector2Scale(dir, float32(dtspeed))
-
 						if rl.CheckCollisionCircles(p.pos, enemySize, pp.pos, enemySize) {
 							collisions = append(collisions, CollisionPair{p, pp})
 						}
@@ -132,11 +126,11 @@ func main() {
 			anyColliding = len(collisions) > 0
 
 			for _, collision := range collisions {
-				// dist := rl.Vector2Distance(collision.first.pos, collision.second.pos)
-				// desiredDist := enemySize * 2
-				// diff := desiredDist - dist
-				pToColliding := rl.Vector2Scale(rl.Vector2Normalize(rl.Vector2Subtract(collision.second.pos, collision.first.pos)), 0.1)
-				collidingToP := rl.Vector2Scale(rl.Vector2Normalize(rl.Vector2Subtract(collision.first.pos, collision.second.pos)), 0.1)
+				//dist := rl.Vector2Distance(collision.first.pos, collision.second.pos)
+				//desiredDist := enemySize * 2
+				//diff := desiredDist - dist
+				pToColliding := rl.Vector2Scale(rl.Vector2Normalize(rl.Vector2Subtract(collision.second.pos, collision.first.pos)), 1)
+				collidingToP := rl.Vector2Scale(rl.Vector2Normalize(rl.Vector2Subtract(collision.first.pos, collision.second.pos)), 1)
 				collision.first.pos = rl.Vector2Add(collision.first.pos, collidingToP)
 				collision.second.pos = rl.Vector2Add(collision.second.pos, pToColliding)
 			}
