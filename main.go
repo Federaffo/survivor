@@ -4,6 +4,10 @@ import (
 	rl "github.com/gen2brain/raylib-go/raylib"
 )
 
+const (
+    MAX_COLLISION_ORDERING_ITERS = 8
+)
+
 var (
 	playerSize float32
 	enemySize  float32
@@ -109,32 +113,32 @@ func main() {
 		}
 
 		anyColliding := true
-		for anyColliding {
+        for iters := 0; anyColliding && iters < MAX_COLLISION_ORDERING_ITERS; iters++ {
 			anyColliding = false
-			collisions := []CollisionPair{}
+	        collisions := []CollisionPair{}
 
-			for i, p := range enemyList {
-				for j, pp := range enemyList {
-					if i != j {
-						if rl.CheckCollisionCircles(p.pos, enemySize, pp.pos, enemySize) {
-							collisions = append(collisions, CollisionPair{p, pp})
-						}
-					}
-				}
-			}
+            for i := 0; i < len(enemyList); i++ {
+                p := enemyList[i]
+                for j := i + 1; j < len(enemyList); j++ {
+                    pp := enemyList[j]
+                    if rl.CheckCollisionCircles(p.pos, enemySize, pp.pos, enemySize) {
+                        collisions = append(collisions, CollisionPair{p, pp})
+                    }
+                }
+            }
 
 			anyColliding = len(collisions) > 0
 
-			for _, collision := range collisions {
-				//dist := rl.Vector2Distance(collision.first.pos, collision.second.pos)
-				//desiredDist := enemySize * 2
-				//diff := desiredDist - dist
-				pToColliding := rl.Vector2Scale(rl.Vector2Normalize(rl.Vector2Subtract(collision.second.pos, collision.first.pos)), 1)
-				collidingToP := rl.Vector2Scale(rl.Vector2Normalize(rl.Vector2Subtract(collision.first.pos, collision.second.pos)), 1)
-				collision.first.pos = rl.Vector2Add(collision.first.pos, collidingToP)
-				collision.second.pos = rl.Vector2Add(collision.second.pos, pToColliding)
-			}
-		}
+            for _, collision := range collisions {
+                dist := rl.Vector2Distance(collision.first.pos, collision.second.pos)
+                desiredDist := enemySize * 2
+                diff := desiredDist - dist
+                pToColliding := rl.Vector2Scale(rl.Vector2Normalize(rl.Vector2Subtract(collision.second.pos, collision.first.pos)), diff/2)
+                collidingToP := rl.Vector2Scale(rl.Vector2Normalize(rl.Vector2Subtract(collision.first.pos, collision.second.pos)), diff/2)
+                collision.first.pos = rl.Vector2Add(collision.first.pos, collidingToP)
+                collision.second.pos = rl.Vector2Add(collision.second.pos, pToColliding)
+            }
+        }
 
 		// check collision between proj and enemy
 		for _, p := range projList {
