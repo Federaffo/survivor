@@ -24,6 +24,7 @@ type weapon struct {
 }
 
 var PISTOL weapon = weapon{shootingDelay: 0.5, projDamage: 50, nProj: 1}
+var MITRA weapon = weapon{shootingDelay: 0.1, projDamage: 50, nProj: 1}
 
 var (
 	playerSpeed float32 = 200
