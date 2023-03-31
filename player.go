@@ -11,9 +11,19 @@ type player struct {
 	CurrentHp int
 	Pos       rl.Vector2
 
+	currentWeapon weapon
+
 	lookAt    rl.Vector2
 	lookAtSet bool
 }
+
+type weapon struct {
+	shootingDelay float64
+	projDamage    float32
+	nProj         int
+}
+
+var PISTOL weapon = weapon{shootingDelay: 0.5, projDamage: 50, nProj: 1}
 
 var (
 	playerSpeed float32 = 200
@@ -21,11 +31,12 @@ var (
 
 func NewPlayer(totalHp int) player {
 	return player{
-		TotalHp:   totalHp,
-		CurrentHp: totalHp,
-		Pos:       rl.NewVector2(200, 200),
-		lookAt:    rl.NewVector2(0, 0),
-		lookAtSet: false,
+		TotalHp:       totalHp,
+		CurrentHp:     totalHp,
+		Pos:           rl.NewVector2(200, 200),
+		lookAt:        rl.NewVector2(0, 0),
+		currentWeapon: PISTOL,
+		lookAtSet:     false,
 	}
 }
 
@@ -65,4 +76,14 @@ func (p *player) Render() {
 		rl.DrawRectanglePro(directionRectangle, rl.NewVector2(0, 1), rotation, rl.Green)
 	}
 	rl.DrawCircle(int32(p.Pos.X), int32(p.Pos.Y), playerSize, rl.Red)
+}
+
+func (p *player) Shoot() []*Projectile {
+	var projs []*Projectile
+	for i := 0; i < p.currentWeapon.nProj; i++ {
+		noise := rl.GetRandomValue(-100, 100)
+		noisedDirection := rl.Vector2Add(rl.GetMousePosition(), rl.NewVector2(float32(noise), float32(noise)))
+		projs = append(projs, NewProj(p.Pos, noisedDirection, p.currentWeapon.projDamage))
+	}
+	return projs
 }
