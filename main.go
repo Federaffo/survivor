@@ -5,7 +5,9 @@ import (
 )
 
 const (
-    MAX_COLLISION_ORDERING_ITERS = 8
+    MAX_COLLISION_ORDERING_ITERS = 15
+    SPACE_GRID_WIDTH = 100
+    SPACE_GRID_HEIGHT = 100
 )
 
 var (
@@ -65,6 +67,14 @@ func main() {
 	projSize = float32(w) / 1000
 	enemySize = float32(w) / 200
 
+    gridCellWidth := w / SPACE_GRID_WIDTH
+    gridCellHeight:= h / SPACE_GRID_HEIGHT
+
+    spaceGrid := make([][][]int, SPACE_GRID_HEIGHT + 2)
+    for i := 0; i < SPACE_GRID_HEIGHT + 2; i++ {
+        spaceGrid[i] = make([][]int, SPACE_GRID_WIDTH + 2)
+    }
+
 	for !rl.WindowShouldClose() {
 		currentTime := rl.GetTime()
 		dt := currentTime - lastTime
@@ -97,6 +107,21 @@ func main() {
 			}
 		}
 
+        updateSpaceGrid := func () {
+            for y := range spaceGrid {
+                for x := range spaceGrid[y] {
+                    spaceGrid[y][x] = []int{}
+                }
+            }
+
+            for i, enemy := range enemyList {
+                gy := ((int(enemy.pos.Y) / gridCellHeight) % SPACE_GRID_HEIGHT) + 1
+                gx := ((int(enemy.pos.X) / gridCellWidth) % SPACE_GRID_WIDTH) + 1
+                spaceGrid[gy][gx] = append(spaceGrid[gy][gx], i)
+            }
+        }
+
+
 		// move projectile
 		for _, p := range projList {
 			p.Update(dt)
@@ -114,15 +139,28 @@ func main() {
 
 		anyColliding := true
         for iters := 0; anyColliding && iters < MAX_COLLISION_ORDERING_ITERS; iters++ {
+            // Update space grid
+            updateSpaceGrid()
+
 			anyColliding = false
 	        collisions := []CollisionPair{}
 
-            for i := 0; i < len(enemyList); i++ {
-                p := enemyList[i]
-                for j := i + 1; j < len(enemyList); j++ {
-                    pp := enemyList[j]
-                    if rl.CheckCollisionCircles(p.pos, enemySize, pp.pos, enemySize) {
-                        collisions = append(collisions, CollisionPair{p, pp})
+            for y := 1; y < len(spaceGrid) - 2; y++ {
+                for x := 1; x < len(spaceGrid[y]) - 2; x++ {
+                    central := spaceGrid[y][x]
+                    for yy := y-1; yy < y + 2; yy++ {
+                        for xx := x-1; xx < y + 2; xx++ {
+                            around := spaceGrid[yy][xx]
+                            for _, enemyId := range central {
+                                p := enemyList[enemyId]
+                                for _, nearbyEnemyId := range around {
+                                    pp := enemyList[nearbyEnemyId]
+                                    if rl.CheckCollisionCircles(p.pos, enemySize, pp.pos, enemySize) && nearbyEnemyId != enemyId {
+                                        collisions = append(collisions, CollisionPair{p, pp})
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
