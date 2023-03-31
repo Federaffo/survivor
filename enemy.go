@@ -5,7 +5,7 @@ import (
 )
 
 var (
-	enemySpeed float32 = 150
+	enemySpeed float32 = 70
 )
 
 type Enemy struct {

@@ -1,13 +1,14 @@
 package main
 
 import (
+    "fmt"
 	rl "github.com/gen2brain/raylib-go/raylib"
 )
 
 const (
-    MAX_COLLISION_ORDERING_ITERS = 10
-    SPACE_GRID_WIDTH = 40
-    SPACE_GRID_HEIGHT = 40
+    MAX_COLLISION_ORDERING_ITERS = 8
+    SPACE_GRID_WIDTH = 50
+    SPACE_GRID_HEIGHT = 50
 )
 
 var (
@@ -58,7 +59,7 @@ func main() {
 
 	lastShoot := lastTime
 	lastSpawn := lastTime
-	spawnRate := 0.1
+	spawnRate := 0.03
 
 	w = rl.GetMonitorWidth(display)
 	h = rl.GetMonitorHeight(display)
@@ -115,7 +116,7 @@ func main() {
         updateSpaceGrid := func () {
             for y := range spaceGrid {
                 for x := range spaceGrid[y] {
-                    spaceGrid[y][x] = nil
+                    spaceGrid[y][x] = make([]int, 0)
                 }
             }
 
@@ -125,7 +126,6 @@ func main() {
                 spaceGrid[gy][gx] = append(spaceGrid[gy][gx], i)
             }
         }
-
 
 		// move projectile
 		for _, p := range projList {
@@ -148,29 +148,37 @@ func main() {
             updateSpaceGrid()
 
 			anyColliding = false
-			collisions := []CollisionPair{}
+		    collisions := []CollisionPair{}
 
+            __iters := 0
             for y := 1; y < len(spaceGrid) - 2; y++ {
                 for x := 1; x < len(spaceGrid[y]) - 2; x++ {
                     central := spaceGrid[y][x]
+
                     for yy := y-1; yy < y + 2; yy++ {
-                        for xx := x-1; xx < y + 2; xx++ {
+                        for xx := x-1; xx < x + 2; xx++ {
+
                             around := spaceGrid[yy][xx]
+
                             for _, enemyId := range central {
                                 p := enemyList[enemyId]
                                 for _, nearbyEnemyId := range around {
                                     pp := enemyList[nearbyEnemyId]
+                                    __iters++
                                     if rl.CheckCollisionCircles(p.pos, enemySize, pp.pos, enemySize) && nearbyEnemyId != enemyId {
                                         collisions = append(collisions, CollisionPair{p, pp})
                                     }
                                 }
                             }
+
                         }
                     }
+
                 }
             }
 
 			anyColliding = len(collisions) > 0
+            fmt.Printf("\rIters %d Collisions: %d                ", __iters, len(collisions));
 
 			for _, collision := range collisions {
 				dist := rl.Vector2Distance(collision.first.pos, collision.second.pos)
