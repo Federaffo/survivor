@@ -5,9 +5,9 @@ import (
 )
 
 const (
-    MAX_COLLISION_ORDERING_ITERS = 15
-    SPACE_GRID_WIDTH = 100
-    SPACE_GRID_HEIGHT = 100
+    MAX_COLLISION_ORDERING_ITERS = 10
+    SPACE_GRID_WIDTH = 40
+    SPACE_GRID_HEIGHT = 40
 )
 
 var (
@@ -56,6 +56,7 @@ func main() {
 
 	lastTime := rl.GetTime()
 
+	lastShoot := lastTime
 	lastSpawn := lastTime
 	spawnRate := 0.1
 
@@ -85,10 +86,14 @@ func main() {
 
 		// shoot
 		{
-			if rl.IsMouseButtonPressed(0) {
-				p := NewProj(player.Pos, mousePosition)
-				projList = append(projList, p)
-				worldItems = append(worldItems, p)
+			if rl.IsMouseButtonDown(0) {
+				if currentTime > player.currentWeapon.shootingDelay+float64(lastShoot) {
+					lastShoot = currentTime
+					for _, p := range player.Shoot() {
+						projList = append(projList, p)
+						worldItems = append(worldItems, p)
+					}
+				}
 
 			}
 		}
@@ -110,7 +115,7 @@ func main() {
         updateSpaceGrid := func () {
             for y := range spaceGrid {
                 for x := range spaceGrid[y] {
-                    spaceGrid[y][x] = []int{}
+                    spaceGrid[y][x] = nil
                 }
             }
 
@@ -143,7 +148,7 @@ func main() {
             updateSpaceGrid()
 
 			anyColliding = false
-	        collisions := []CollisionPair{}
+			collisions := []CollisionPair{}
 
             for y := 1; y < len(spaceGrid) - 2; y++ {
                 for x := 1; x < len(spaceGrid[y]) - 2; x++ {
@@ -167,16 +172,16 @@ func main() {
 
 			anyColliding = len(collisions) > 0
 
-            for _, collision := range collisions {
-                dist := rl.Vector2Distance(collision.first.pos, collision.second.pos)
-                desiredDist := enemySize * 2
-                diff := desiredDist - dist
-                pToColliding := rl.Vector2Scale(rl.Vector2Normalize(rl.Vector2Subtract(collision.second.pos, collision.first.pos)), diff/2)
-                collidingToP := rl.Vector2Scale(rl.Vector2Normalize(rl.Vector2Subtract(collision.first.pos, collision.second.pos)), diff/2)
-                collision.first.pos = rl.Vector2Add(collision.first.pos, collidingToP)
-                collision.second.pos = rl.Vector2Add(collision.second.pos, pToColliding)
-            }
-        }
+			for _, collision := range collisions {
+				dist := rl.Vector2Distance(collision.first.pos, collision.second.pos)
+				desiredDist := enemySize * 2
+				diff := desiredDist - dist
+				pToColliding := rl.Vector2Scale(rl.Vector2Normalize(rl.Vector2Subtract(collision.second.pos, collision.first.pos)), diff/2)
+				collidingToP := rl.Vector2Scale(rl.Vector2Normalize(rl.Vector2Subtract(collision.first.pos, collision.second.pos)), diff/2)
+				collision.first.pos = rl.Vector2Add(collision.first.pos, collidingToP)
+				collision.second.pos = rl.Vector2Add(collision.second.pos, pToColliding)
+			}
+		}
 
 		// check collision between proj and enemy
 		for _, p := range projList {

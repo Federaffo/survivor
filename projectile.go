@@ -16,12 +16,12 @@ type Projectile struct {
 	destroyed bool
 }
 
-func NewProj(initialPos rl.Vector2, direction rl.Vector2) *Projectile {
+func NewProj(initialPos rl.Vector2, direction rl.Vector2, damage float32) *Projectile {
 	dir := rl.Vector2Subtract(direction, initialPos)
 	dir = rl.Vector2Normalize(dir)
 
 	return &Projectile{
-		damage: defaultDamage,
+		damage: damage,
 		pos:    initialPos,
 		dir:    dir,
 	}
