@@ -23,12 +23,12 @@ type weapon struct {
 	nProj         int
 }
 
-var PISTOL weapon = weapon{shootingDelay: 0.5, projDamage: 50, nProj: 1}
-var MITRA weapon = weapon{shootingDelay: 0.1, projDamage: 50, nProj: 1}
-
 var (
-	playerSpeed float32 = 200
+	PISTOL weapon = weapon{shootingDelay: 0.5, projDamage: 50, nProj: 1}
+	MITRA  weapon = weapon{shootingDelay: 0.1, projDamage: 50, nProj: 1}
 )
+
+var playerSpeed float32 = 200
 
 func NewPlayer(totalHp int) player {
 	return player{
@@ -87,4 +87,8 @@ func (p *player) Shoot() []*Projectile {
 		projs = append(projs, NewProj(p.Pos, noisedDirection, p.currentWeapon.projDamage))
 	}
 	return projs
+}
+
+func (p *player) Position() rl.Vector2 {
+	return p.Pos
 }

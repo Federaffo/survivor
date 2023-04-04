@@ -22,3 +22,14 @@ func (l *WeaponLoot) Destroyed() bool {
 func (l *WeaponLoot) Render() {
 	rl.DrawRectangle(int32(l.pos.X), int32(l.pos.Y), int32(lootSize), int32(lootSize), rl.Green)
 }
+
+func (l *WeaponLoot) Position() rl.Vector2 {
+	return l.pos
+}
+
+func (l *WeaponLoot) CheckCollision(other Collides) bool {
+	return false
+}
+
+func (l *WeaponLoot) Rearrange(other Collides) {
+}

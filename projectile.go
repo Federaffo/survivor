@@ -36,10 +36,14 @@ func (p *Projectile) Update(dt float64) {
 	dir := rl.Vector2Scale(p.dir, float32(dtspeed))
 	p.pos = rl.Vector2Add(p.pos, dir)
 
-	//p.hitbox.X = p.pos.X
-	//p.hitbox.Y = p.pos.Y
+	// p.hitbox.X = p.pos.X
+	// p.hitbox.Y = p.pos.Y
 }
 
 func (p *Projectile) Render() {
 	rl.DrawCircle(int32(p.pos.X), int32(p.pos.Y), projSize, rl.Green)
+}
+
+func (p *Projectile) Position() rl.Vector2 {
+	return p.pos
 }
