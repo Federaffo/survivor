@@ -15,6 +15,7 @@ var (
 	playerSize float32
 	enemySize  float32
 	projSize   float32
+	lootSize   float32
 )
 
 type WorldItem interface {
@@ -54,6 +55,7 @@ func main() {
 	var projList []*Projectile
 	var enemyList []*Enemy
 	var worldItems []WorldItem
+	var loots []*WeaponLoot
 
 	lastTime := rl.GetTime()
 
@@ -68,6 +70,7 @@ func main() {
 	playerSize = float32(w) / 150
 	projSize = float32(w) / 1000
 	enemySize = float32(w) / 200
+	lootSize = 60
 
     gridCellWidth := w / SPACE_GRID_WIDTH
     gridCellHeight:= h / SPACE_GRID_HEIGHT
@@ -84,6 +87,28 @@ func main() {
 		mousePosition := rl.GetMousePosition()
 		player.LookAt(mousePosition)
 		player.Update(dt)
+
+		//Spawn weapon
+		{
+			if rl.GetRandomValue(0, 1000) < 5 {
+				x := rl.GetRandomValue(0, int32(w))
+				y := rl.GetRandomValue(0, int32(h))
+				w := NewWeaponLoot(MITRA, rl.NewVector2(float32(x), float32(y)))
+				worldItems = append(worldItems, w)
+				loots = append(loots, w)
+			}
+		}
+
+		// Collision with loot
+		{
+			for _, l := range loots {
+				if rl.CheckCollisionCircleRec(player.Pos, playerSize, rl.NewRectangle(l.pos.X, l.pos.Y, lootSize, lootSize)) {
+					player.currentWeapon = l.weapon
+					l.destroyed = true
+				}
+
+			}
+		}
 
 		// shoot
 		{
@@ -207,13 +232,20 @@ func main() {
 		rl.BeginDrawing()
 		{
 			rl.ClearBackground(rl.Black)
-			for _, r := range projList {
-				r.Render()
+
+			for _, x := range worldItems {
+				x.Render()
 			}
 
-			for _, r := range enemyList {
-				r.Render()
-			}
+			/*
+				for _, r := range projList {
+					r.Render()
+				}
+
+				for _, r := range enemyList {
+					r.Render()
+				}
+			*/
 
 			player.Render()
 		}
