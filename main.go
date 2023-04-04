@@ -1,14 +1,13 @@
 package main
 
 import (
-    "fmt"
 	rl "github.com/gen2brain/raylib-go/raylib"
 )
 
 const (
-    MAX_COLLISION_ORDERING_ITERS = 8
-    SPACE_GRID_WIDTH = 50
-    SPACE_GRID_HEIGHT = 50
+	MAX_COLLISION_ORDERING_ITERS = 8
+	SPACE_GRID_WIDTH             = 50
+	SPACE_GRID_HEIGHT            = 50
 )
 
 var (
@@ -55,6 +54,7 @@ func main() {
 	var projList []*Projectile
 	var enemyList []*Enemy
 	var worldItems []WorldItem
+	var worldBodies []Collides
 	var loots []*WeaponLoot
 
 	lastTime := rl.GetTime()
@@ -72,13 +72,7 @@ func main() {
 	enemySize = float32(w) / 200
 	lootSize = 60
 
-    gridCellWidth := w / SPACE_GRID_WIDTH
-    gridCellHeight:= h / SPACE_GRID_HEIGHT
-
-    spaceGrid := make([][][]int, SPACE_GRID_HEIGHT + 2)
-    for i := 0; i < SPACE_GRID_HEIGHT + 2; i++ {
-        spaceGrid[i] = make([][]int, SPACE_GRID_WIDTH + 2)
-    }
+	spaceGrid := NewCollisionSpace(w, h, SPACE_GRID_WIDTH, SPACE_GRID_HEIGHT)
 
 	for !rl.WindowShouldClose() {
 		currentTime := rl.GetTime()
@@ -88,12 +82,13 @@ func main() {
 		player.LookAt(mousePosition)
 		player.Update(dt)
 
-		//Spawn weapon
+		// Spawn weapon
 		{
-			if rl.GetRandomValue(0, 1000) < 5 {
+			if rl.GetRandomValue(0, 1000) < 3 {
 				x := rl.GetRandomValue(0, int32(w))
 				y := rl.GetRandomValue(0, int32(h))
 				w := NewWeaponLoot(MITRA, rl.NewVector2(float32(x), float32(y)))
+				worldBodies = append(worldBodies, w)
 				worldItems = append(worldItems, w)
 				loots = append(loots, w)
 			}
@@ -106,7 +101,6 @@ func main() {
 					player.currentWeapon = l.weapon
 					l.destroyed = true
 				}
-
 			}
 		}
 
@@ -120,7 +114,6 @@ func main() {
 						worldItems = append(worldItems, p)
 					}
 				}
-
 			}
 		}
 
@@ -135,22 +128,9 @@ func main() {
 				e := NewEnemy(rl.NewVector2(float32(x), float32(y)), 100, 10)
 				enemyList = append(enemyList, e)
 				worldItems = append(worldItems, e)
+				worldBodies = append(worldBodies, e)
 			}
 		}
-
-        updateSpaceGrid := func () {
-            for y := range spaceGrid {
-                for x := range spaceGrid[y] {
-                    spaceGrid[y][x] = make([]int, 0)
-                }
-            }
-
-            for i, enemy := range enemyList {
-                gy := ((int(enemy.pos.Y) / gridCellHeight) % SPACE_GRID_HEIGHT) + 1
-                gx := ((int(enemy.pos.X) / gridCellWidth) % SPACE_GRID_WIDTH) + 1
-                spaceGrid[gy][gx] = append(spaceGrid[gy][gx], i)
-            }
-        }
 
 		// move projectile
 		for _, p := range projList {
@@ -167,54 +147,9 @@ func main() {
 			second *Enemy
 		}
 
-		anyColliding := true
-        for iters := 0; anyColliding && iters < MAX_COLLISION_ORDERING_ITERS; iters++ {
-            // Update space grid
-            updateSpaceGrid()
-
-			anyColliding = false
-		    collisions := []CollisionPair{}
-
-            __iters := 0
-            for y := 1; y < len(spaceGrid) - 2; y++ {
-                for x := 1; x < len(spaceGrid[y]) - 2; x++ {
-                    central := spaceGrid[y][x]
-
-                    for yy := y-1; yy < y + 2; yy++ {
-                        for xx := x-1; xx < x + 2; xx++ {
-
-                            around := spaceGrid[yy][xx]
-
-                            for _, enemyId := range central {
-                                p := enemyList[enemyId]
-                                for _, nearbyEnemyId := range around {
-                                    pp := enemyList[nearbyEnemyId]
-                                    __iters++
-                                    if rl.CheckCollisionCircles(p.pos, enemySize, pp.pos, enemySize) && nearbyEnemyId != enemyId {
-                                        collisions = append(collisions, CollisionPair{p, pp})
-                                    }
-                                }
-                            }
-
-                        }
-                    }
-
-                }
-            }
-
-			anyColliding = len(collisions) > 0
-            fmt.Printf("\rIters %d Collisions: %d                ", __iters, len(collisions));
-
-			for _, collision := range collisions {
-				dist := rl.Vector2Distance(collision.first.pos, collision.second.pos)
-				desiredDist := enemySize * 2
-				diff := desiredDist - dist
-				pToColliding := rl.Vector2Scale(rl.Vector2Normalize(rl.Vector2Subtract(collision.second.pos, collision.first.pos)), diff/2)
-				collidingToP := rl.Vector2Scale(rl.Vector2Normalize(rl.Vector2Subtract(collision.first.pos, collision.second.pos)), diff/2)
-				collision.first.pos = rl.Vector2Add(collision.first.pos, collidingToP)
-				collision.second.pos = rl.Vector2Add(collision.second.pos, pToColliding)
-			}
-		}
+		spaceGrid.RearrangeBodies(MAX_COLLISION_ORDERING_ITERS, worldBodies, func() {
+			spaceGrid.UpdateCells(worldBodies)
+		})
 
 		// check collision between proj and enemy
 		for _, p := range projList {
@@ -248,6 +183,7 @@ func main() {
 			*/
 
 			player.Render()
+			rl.DrawFPS(10, 10)
 		}
 		rl.EndDrawing()
 
