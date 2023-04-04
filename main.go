@@ -6,6 +6,8 @@ import (
 
 const (
 	MAX_COLLISION_ORDERING_ITERS = 8
+	SPACE_GRID_WIDTH             = 50
+	SPACE_GRID_HEIGHT            = 50
 )
 
 var (
@@ -52,13 +54,14 @@ func main() {
 	var projList []*Projectile
 	var enemyList []*Enemy
 	var worldItems []WorldItem
+	var worldBodies []Collides
 	var loots []*WeaponLoot
 
 	lastTime := rl.GetTime()
 
 	lastShoot := lastTime
 	lastSpawn := lastTime
-	spawnRate := 1
+	spawnRate := 0.03
 
 	w = rl.GetMonitorWidth(display)
 	h = rl.GetMonitorHeight(display)
@@ -69,6 +72,8 @@ func main() {
 	enemySize = float32(w) / 200
 	lootSize = 60
 
+	spaceGrid := NewCollisionSpace(w, h, SPACE_GRID_WIDTH, SPACE_GRID_HEIGHT)
+
 	for !rl.WindowShouldClose() {
 		currentTime := rl.GetTime()
 		dt := currentTime - lastTime
@@ -77,12 +82,13 @@ func main() {
 		player.LookAt(mousePosition)
 		player.Update(dt)
 
-		//Spawn weapon
+		// Spawn weapon
 		{
-			if rl.GetRandomValue(0, 1000) < 5 {
+			if rl.GetRandomValue(0, 1000) < 3 {
 				x := rl.GetRandomValue(0, int32(w))
 				y := rl.GetRandomValue(0, int32(h))
 				w := NewWeaponLoot(MITRA, rl.NewVector2(float32(x), float32(y)))
+				worldBodies = append(worldBodies, w)
 				worldItems = append(worldItems, w)
 				loots = append(loots, w)
 			}
@@ -95,7 +101,6 @@ func main() {
 					player.currentWeapon = l.weapon
 					l.destroyed = true
 				}
-
 			}
 		}
 
@@ -109,7 +114,6 @@ func main() {
 						worldItems = append(worldItems, p)
 					}
 				}
-
 			}
 		}
 
@@ -124,6 +128,7 @@ func main() {
 				e := NewEnemy(rl.NewVector2(float32(x), float32(y)), 100, 10)
 				enemyList = append(enemyList, e)
 				worldItems = append(worldItems, e)
+				worldBodies = append(worldBodies, e)
 			}
 		}
 
@@ -142,33 +147,9 @@ func main() {
 			second *Enemy
 		}
 
-		anyColliding := true
-		for iters := 0; anyColliding && iters < MAX_COLLISION_ORDERING_ITERS; iters++ {
-			anyColliding = false
-			collisions := []CollisionPair{}
-
-			for i := 0; i < len(enemyList); i++ {
-				p := enemyList[i]
-				for j := i + 1; j < len(enemyList); j++ {
-					pp := enemyList[j]
-					if rl.CheckCollisionCircles(p.pos, enemySize, pp.pos, enemySize) {
-						collisions = append(collisions, CollisionPair{p, pp})
-					}
-				}
-			}
-
-			anyColliding = len(collisions) > 0
-
-			for _, collision := range collisions {
-				dist := rl.Vector2Distance(collision.first.pos, collision.second.pos)
-				desiredDist := enemySize * 2
-				diff := desiredDist - dist
-				pToColliding := rl.Vector2Scale(rl.Vector2Normalize(rl.Vector2Subtract(collision.second.pos, collision.first.pos)), diff/2)
-				collidingToP := rl.Vector2Scale(rl.Vector2Normalize(rl.Vector2Subtract(collision.first.pos, collision.second.pos)), diff/2)
-				collision.first.pos = rl.Vector2Add(collision.first.pos, collidingToP)
-				collision.second.pos = rl.Vector2Add(collision.second.pos, pToColliding)
-			}
-		}
+		spaceGrid.RearrangeBodies(MAX_COLLISION_ORDERING_ITERS, worldBodies, func() {
+			spaceGrid.UpdateCells(worldBodies)
+		})
 
 		// check collision between proj and enemy
 		for _, p := range projList {
@@ -202,6 +183,7 @@ func main() {
 			*/
 
 			player.Render()
+			rl.DrawFPS(10, 10)
 		}
 		rl.EndDrawing()
 
