@@ -5,9 +5,9 @@ import (
 )
 
 const (
-	MAX_COLLISION_ORDERING_ITERS = 8
-	SPACE_GRID_WIDTH             = 50
-	SPACE_GRID_HEIGHT            = 50
+	MAX_COLLISION_ORDERING_ITERS = 3
+	SPACE_GRID_WIDTH             = 70
+	SPACE_GRID_HEIGHT            = 70
 )
 
 var (
@@ -61,7 +61,7 @@ func main() {
 
 	lastShoot := lastTime
 	lastSpawn := lastTime
-	spawnRate := 0.03
+	spawnRate := 0.8
 
 	w = rl.GetMonitorWidth(display)
 	h = rl.GetMonitorHeight(display)
@@ -125,7 +125,7 @@ func main() {
 				x := rl.GetRandomValue(0, int32(w))
 				y := rl.GetRandomValue(0, int32(h))
 
-				e := NewEnemy(rl.NewVector2(float32(x), float32(y)), 100, 10)
+				e := NewEnemy(rl.NewVector2(float32(x), float32(y)), 100, 10, enemySize)
 				enemyList = append(enemyList, e)
 				worldItems = append(worldItems, e)
 				worldBodies = append(worldBodies, e)

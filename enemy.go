@@ -14,12 +14,13 @@ type Enemy struct {
 	destroyed         bool
 }
 
-func NewEnemy(pos rl.Vector2, maxHealth float32, damage float32) *Enemy {
+func NewEnemy(pos rl.Vector2, maxHealth, damage, bodyRadius float32) *Enemy {
 	s := Enemy{
-		pos:       pos,
-		damage:    damage,
-		health:    maxHealth,
-		maxHealth: maxHealth, // Should be set based on level
+		pos:        pos,
+		bodyRadius: bodyRadius,
+		damage:     damage,
+		health:     maxHealth,
+		maxHealth:  maxHealth, // Should be set based on level
 	}
 	return &s
 }
@@ -64,7 +65,7 @@ func (e *Enemy) Rearrange(other Collides) {
 	case *Enemy:
 		enemy := other.(*Enemy)
 		dist := rl.Vector2Distance(e.pos, enemy.pos)
-		desiredDist := enemySize * 2
+		desiredDist := e.bodyRadius + enemy.bodyRadius
 		diff := desiredDist - dist
 		pToColliding := rl.Vector2Scale(rl.Vector2Normalize(rl.Vector2Subtract(enemy.pos, e.pos)), diff/2)
 		collidingToP := rl.Vector2Scale(rl.Vector2Normalize(rl.Vector2Subtract(e.pos, enemy.pos)), diff/2)
