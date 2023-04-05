@@ -40,6 +40,13 @@ func UpdateWorldItems[T WorldItem](worldItems []T) []T {
 	return worldItems
 }
 
+func RandomPointInCircle(radius float32) rl.Vector2 {
+    x := float32(rl.GetRandomValue(-100, 100))
+    y := float32(rl.GetRandomValue(-100, 100))
+    vector := rl.Vector2Scale((rl.Vector2Normalize(rl.NewVector2(x, y))), radius)
+    return vector
+}
+
 func main() {
 	display := rl.GetCurrentMonitor()
 
@@ -122,10 +129,10 @@ func main() {
 			if currentTime > lastSpawn+float64(spawnRate) {
 				lastSpawn = currentTime
 
-				x := rl.GetRandomValue(0, int32(w))
-				y := rl.GetRandomValue(0, int32(h))
+                spawnPosition := RandomPointInCircle(100)
+                spawnPosition = rl.Vector2Add(spawnPosition, player.Pos)
 
-				e := NewEnemy(rl.NewVector2(float32(x), float32(y)), 100, 10, enemySize)
+				e := NewEnemy(rl.NewVector2(float32(spawnPosition.X), float32(spawnPosition.Y)), 100, 10, enemySize)
 				enemyList = append(enemyList, e)
 				worldItems = append(worldItems, e)
 				worldBodies = append(worldBodies, e)
