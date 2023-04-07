@@ -68,7 +68,7 @@ func main() {
 
 	lastShoot := lastTime
 	lastSpawn := lastTime
-	spawnRate := 0.8
+	spawnRate := 0.05
 
 	w = rl.GetMonitorWidth(display)
 	h = rl.GetMonitorHeight(display)
@@ -129,13 +129,32 @@ func main() {
 			if currentTime > lastSpawn+float64(spawnRate) {
 				lastSpawn = currentTime
 
-                spawnPosition := RandomPointInCircle(100)
-                spawnPosition = rl.Vector2Add(spawnPosition, player.Pos)
+				respawn := true
+				n := NewEnemy(rl.NewVector2(100,110), 100, 10, enemySize)
+				for respawn{
+					respawn = false
+					spawnPosition := RandomPointInCircle(200)
+					spawnPosition = rl.Vector2Add(spawnPosition, player.Pos)
+					
+					n = NewEnemy(rl.NewVector2(float32(spawnPosition.X), float32(spawnPosition.Y)), 100, 10, enemySize)
+					if n.pos.X < 100 || n.pos.Y < 100{
+						respawn = true
+						continue
+					}
+					for _, e :=  range enemyList  {
 
-				e := NewEnemy(rl.NewVector2(float32(spawnPosition.X), float32(spawnPosition.Y)), 100, 10, enemySize)
-				enemyList = append(enemyList, e)
-				worldItems = append(worldItems, e)
-				worldBodies = append(worldBodies, e)
+						if rl.CheckCollisionCircles(n.pos,enemySize, e.pos,  enemySize){
+							respawn = true
+							break
+						}
+					}
+
+					if !respawn{	
+						enemyList = append(enemyList, n)
+						worldItems = append(worldItems, n)
+						worldBodies = append(worldBodies, n)
+					}
+				}
 			}
 		}
 
