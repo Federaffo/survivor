@@ -361,6 +361,9 @@ func main() {
 		worldItems = append(worldItems, blocks[i])
 	}
 
+	// Update global blocks reference for enemy collision
+	UpdateGlobalBlocks(blocks)
+
 	for !rl.WindowShouldClose() {
 		currentTime := rl.GetTime()
 		dt := currentTime - lastTime
@@ -481,6 +484,9 @@ func main() {
 				for _, block := range blocks {
 					worldItems = append(worldItems, block)
 				}
+
+				// Update global blocks reference after reset
+				UpdateGlobalBlocks(blocks)
 			}
 
 			lastTime = currentTime
@@ -721,7 +727,7 @@ func main() {
 
 		// move enemy
 		for _, p := range enemyList {
-			p.Move(player.Pos, dt, blocks)
+			p.Move(player.Pos, dt)
 		}
 
 		// Spawn grenade pickups

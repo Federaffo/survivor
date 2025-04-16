@@ -7,6 +7,14 @@ import (
 var enemySpeed float32 = 70
 var enemySprite rl.Texture2D // Single shared texture for all enemies
 
+// Variable to store blocks globally for enemy collision checks
+var globalBlocks []*Block
+
+// Update the global blocks reference
+func UpdateGlobalBlocks(blocks []*Block) {
+	globalBlocks = blocks
+}
+
 // Initialize the enemy sprite
 func InitEnemySprite() {
 	// Try different possible paths for the zombie sprite
@@ -54,7 +62,7 @@ func NewEnemy(pos rl.Vector2, maxHealth, damage, bodyRadius float32) *Enemy {
 	return &s
 }
 
-func (e *Enemy) Move(playerPos rl.Vector2, dt float64, blocks []*Block) {
+func (e *Enemy) Move(playerPos rl.Vector2, dt float64) {
 	dtspeed := dt * float64(enemySpeed)
 
 	// Store original position
@@ -69,54 +77,56 @@ func (e *Enemy) Move(playerPos rl.Vector2, dt float64, blocks []*Block) {
 	e.pos = rl.Vector2Add(e.pos, dir)
 
 	// Check for collisions with blocks
-	enemyRect := rl.NewRectangle(e.pos.X-e.bodyRadius, e.pos.Y-e.bodyRadius, e.bodyRadius*2, e.bodyRadius*2)
-	for _, block := range blocks {
-		blockRect := rl.NewRectangle(block.pos.X, block.pos.Y, block.width, block.height)
-		if rl.CheckCollisionRecs(enemyRect, blockRect) {
-			// On collision, revert to original position
-			e.pos = originalPos
+	if len(globalBlocks) > 0 {
+		enemyRect := rl.NewRectangle(e.pos.X-e.bodyRadius, e.pos.Y-e.bodyRadius, e.bodyRadius*2, e.bodyRadius*2)
+		for _, block := range globalBlocks {
+			blockRect := rl.NewRectangle(block.pos.X, block.pos.Y, block.width, block.height)
+			if rl.CheckCollisionRecs(enemyRect, blockRect) {
+				// On collision, revert to original position
+				e.pos = originalPos
 
-			// Try to navigate around the block - implement basic pathfinding
-			// Try moving only horizontally
-			horizontalPos := originalPos
-			horizontalPos.X += dir.X
+				// Try to navigate around the block - implement basic pathfinding
+				// Try moving only horizontally
+				horizontalPos := originalPos
+				horizontalPos.X += dir.X
 
-			// Check if horizontal movement would cause collision
-			horizontalRect := rl.NewRectangle(horizontalPos.X-e.bodyRadius, horizontalPos.Y-e.bodyRadius, e.bodyRadius*2, e.bodyRadius*2)
-			horizontalCollision := false
-			for _, b := range blocks {
-				bRect := rl.NewRectangle(b.pos.X, b.pos.Y, b.width, b.height)
-				if rl.CheckCollisionRecs(horizontalRect, bRect) {
-					horizontalCollision = true
-					break
+				// Check if horizontal movement would cause collision
+				horizontalRect := rl.NewRectangle(horizontalPos.X-e.bodyRadius, horizontalPos.Y-e.bodyRadius, e.bodyRadius*2, e.bodyRadius*2)
+				horizontalCollision := false
+				for _, b := range globalBlocks {
+					bRect := rl.NewRectangle(b.pos.X, b.pos.Y, b.width, b.height)
+					if rl.CheckCollisionRecs(horizontalRect, bRect) {
+						horizontalCollision = true
+						break
+					}
 				}
-			}
 
-			// Try moving only vertically
-			verticalPos := originalPos
-			verticalPos.Y += dir.Y
+				// Try moving only vertically
+				verticalPos := originalPos
+				verticalPos.Y += dir.Y
 
-			// Check if vertical movement would cause collision
-			verticalRect := rl.NewRectangle(verticalPos.X-e.bodyRadius, verticalPos.Y-e.bodyRadius, e.bodyRadius*2, e.bodyRadius*2)
-			verticalCollision := false
-			for _, b := range blocks {
-				bRect := rl.NewRectangle(b.pos.X, b.pos.Y, b.width, b.height)
-				if rl.CheckCollisionRecs(verticalRect, bRect) {
-					verticalCollision = true
-					break
+				// Check if vertical movement would cause collision
+				verticalRect := rl.NewRectangle(verticalPos.X-e.bodyRadius, verticalPos.Y-e.bodyRadius, e.bodyRadius*2, e.bodyRadius*2)
+				verticalCollision := false
+				for _, b := range globalBlocks {
+					bRect := rl.NewRectangle(b.pos.X, b.pos.Y, b.width, b.height)
+					if rl.CheckCollisionRecs(verticalRect, bRect) {
+						verticalCollision = true
+						break
+					}
 				}
-			}
 
-			// If horizontal movement is possible, do that
-			if !horizontalCollision {
-				e.pos = horizontalPos
-			} else if !verticalCollision {
-				// Otherwise try vertical movement
-				e.pos = verticalPos
-			}
-			// If both cause collisions, the enemy stays in place for this frame
+				// If horizontal movement is possible, do that
+				if !horizontalCollision {
+					e.pos = horizontalPos
+				} else if !verticalCollision {
+					// Otherwise try vertical movement
+					e.pos = verticalPos
+				}
+				// If both cause collisions, the enemy stays in place for this frame
 
-			break
+				break
+			}
 		}
 	}
 }
@@ -249,9 +259,87 @@ func (e *Enemy) Rearrange(other Collides) {
 			pToColliding = rl.Vector2Add(pToColliding, jitter)
 			collidingToP = rl.Vector2Add(collidingToP, rl.Vector2Negate(jitter))
 
-			// Move objects apart
-			e.pos = rl.Vector2Add(e.pos, collidingToP)
-			enemy.pos = rl.Vector2Add(enemy.pos, pToColliding)
+			// Store original positions
+			originalPosE := e.pos
+			originalPosEnemy := enemy.pos
+
+			// Calculate new positions
+			newPosE := rl.Vector2Add(e.pos, collidingToP)
+			newPosEnemy := rl.Vector2Add(enemy.pos, pToColliding)
+
+			// Check if new positions would cause collision with blocks
+			eCollides := false
+			enemyCollides := false
+
+			// Check for block collisions only if we have global blocks
+			if len(globalBlocks) > 0 {
+				// Create enemy collision rectangles
+				eRect := rl.NewRectangle(newPosE.X-e.bodyRadius, newPosE.Y-e.bodyRadius, e.bodyRadius*2, e.bodyRadius*2)
+				enemyRect := rl.NewRectangle(newPosEnemy.X-enemy.bodyRadius, newPosEnemy.Y-enemy.bodyRadius, enemy.bodyRadius*2, enemy.bodyRadius*2)
+
+				for _, block := range globalBlocks {
+					blockRect := rl.NewRectangle(block.pos.X, block.pos.Y, block.width, block.height)
+
+					if rl.CheckCollisionRecs(eRect, blockRect) {
+						eCollides = true
+					}
+
+					if rl.CheckCollisionRecs(enemyRect, blockRect) {
+						enemyCollides = true
+					}
+				}
+			}
+
+			// Only apply movement if it doesn't cause block collision
+			if !eCollides {
+				e.pos = newPosE
+			}
+
+			if !enemyCollides {
+				enemy.pos = newPosEnemy
+			}
+
+			// If both enemies would collide with blocks, try a different approach
+			if eCollides && enemyCollides && len(globalBlocks) > 0 {
+				// Try moving them along the perpendicular direction
+				perpDir := rl.NewVector2(-dir.Y, dir.X)
+
+				// Calculate perpendicular push vectors
+				perpToE := rl.Vector2Scale(perpDir, moveAmount/2)
+				perpToEnemy := rl.Vector2Scale(rl.Vector2Negate(perpDir), moveAmount/2)
+
+				// Try new perpendicular positions
+				newPerpPosE := rl.Vector2Add(originalPosE, perpToE)
+				newPerpPosEnemy := rl.Vector2Add(originalPosEnemy, perpToEnemy)
+
+				// Check perpendicular positions for block collisions
+				ePerpRect := rl.NewRectangle(newPerpPosE.X-e.bodyRadius, newPerpPosE.Y-e.bodyRadius, e.bodyRadius*2, e.bodyRadius*2)
+				enemyPerpRect := rl.NewRectangle(newPerpPosEnemy.X-enemy.bodyRadius, newPerpPosEnemy.Y-enemy.bodyRadius, enemy.bodyRadius*2, enemy.bodyRadius*2)
+
+				ePerPCollides := false
+				enemyPerpCollides := false
+
+				for _, block := range globalBlocks {
+					blockRect := rl.NewRectangle(block.pos.X, block.pos.Y, block.width, block.height)
+
+					if rl.CheckCollisionRecs(ePerpRect, blockRect) {
+						ePerPCollides = true
+					}
+
+					if rl.CheckCollisionRecs(enemyPerpRect, blockRect) {
+						enemyPerpCollides = true
+					}
+				}
+
+				// Apply perpendicular movement if valid
+				if !ePerPCollides {
+					e.pos = newPerpPosE
+				}
+
+				if !enemyPerpCollides {
+					enemy.pos = newPerpPosEnemy
+				}
+			}
 		}
 	}
 }
