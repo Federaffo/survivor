@@ -13,10 +13,11 @@ const (
 )
 
 var (
-	playerSize float32
-	enemySize  float32
-	projSize   float32
-	lootSize   float32
+	playerSize        float32
+	enemySize         float32
+	projSize          float32
+	lootSize          float32
+	backgroundTexture rl.Texture2D // Background texture
 )
 
 type WorldItem interface {
@@ -84,6 +85,24 @@ func main() {
 	rl.InitWindow(int32(w), int32(h), "Survivor")
 	rl.SetTargetFPS(60)
 
+	// Print debugging info about sprite loading
+	rl.TraceLog(rl.LogWarning, "Looking for sprite files: player_left.png, player_right.png, and zombie.png")
+
+	// Initialize enemy sprite
+	InitEnemySprite()
+
+	// Load background texture
+	backgroundTexture = rl.LoadTexture("assets/background.png")
+	rl.TraceLog(rl.LogInfo, "Loaded background texture: %dx%d", backgroundTexture.Width, backgroundTexture.Height)
+
+	// Check if texture loaded correctly
+	if backgroundTexture.Width == 0 || backgroundTexture.Height == 0 {
+		rl.TraceLog(rl.LogError, "Failed to load background texture or dimensions are zero")
+		// Set default texture size to prevent division by zero
+		backgroundTexture.Width = 8
+		backgroundTexture.Height = 8
+	}
+
 	player := NewPlayer(1000)
 
 	var projList []*Projectile
@@ -122,7 +141,7 @@ func main() {
 	h = rl.GetMonitorHeight(display)
 
 	// have to be scaled based on screen size
-	playerSize = float32(w) / 150
+	playerSize = float32(w) / 120
 	projSize = float32(w) / 1000
 	enemySize = float32(w) / 200
 	lootSize = 60
@@ -251,7 +270,7 @@ func main() {
 			}
 
 			for _, l := range loots {
-				if rl.CheckCollisionCircleRec(player.Pos, playerSize, rl.NewRectangle(l.pos.X, l.pos.Y, lootSize, lootSize)) {
+				if rl.CheckCollisionCircleRec(player.Pos, playerSize*0.7, rl.NewRectangle(l.pos.X, l.pos.Y, lootSize, lootSize)) {
 					player.currentWeapon = l.weapon
 					player.isReloading = false // Cancel any reload in progress
 
@@ -292,7 +311,7 @@ func main() {
 
 			// Handle ammo pickup
 			for _, a := range ammoLoots {
-				if !a.destroyed && rl.CheckCollisionCircleRec(player.Pos, playerSize, rl.NewRectangle(a.pos.X, a.pos.Y, lootSize, lootSize)) {
+				if !a.destroyed && rl.CheckCollisionCircleRec(player.Pos, playerSize*0.7, rl.NewRectangle(a.pos.X, a.pos.Y, lootSize, lootSize)) {
 					player.ammo += a.amount
 					a.destroyed = true
 
@@ -419,7 +438,7 @@ func main() {
 
 			// Handle grenade pickup
 			for _, g := range grenadePickups {
-				if !g.destroyed && rl.CheckCollisionCircleRec(player.Pos, playerSize,
+				if !g.destroyed && rl.CheckCollisionCircleRec(player.Pos, playerSize*0.7,
 					rl.NewRectangle(g.pos.X, g.pos.Y, float32(g.size), float32(g.size))) {
 					player.grenades += g.amount
 					g.destroyed = true
@@ -452,7 +471,7 @@ func main() {
 
 		// Check collision between enemies and player
 		for _, e := range enemyList {
-			if rl.CheckCollisionCircles(player.Pos, playerSize, e.pos, enemySize) {
+			if rl.CheckCollisionCircles(player.Pos, playerSize*0.7, e.pos, enemySize) {
 				// Apply damage to player based on enemy's damage stat
 				player.TakeDamage(e.damage)
 
@@ -472,6 +491,30 @@ func main() {
 		rl.BeginDrawing()
 		{
 			rl.ClearBackground(rl.Black)
+
+			// Draw tiled background - only if texture was loaded properly
+			if backgroundTexture.ID > 0 {
+				tileWidth := backgroundTexture.Width
+				tileHeight := backgroundTexture.Height
+
+				// Ensure tile dimensions are not zero to avoid division by zero
+				if tileWidth > 0 && tileHeight > 0 {
+					tilesX := int(w)/int(tileWidth) + 1
+					tilesY := int(h)/int(tileHeight) + 1
+
+					for y := 0; y < tilesY; y++ {
+						for x := 0; x < tilesX; x++ {
+							rl.DrawTexture(backgroundTexture,
+								int32(x)*tileWidth,
+								int32(y)*tileHeight,
+								rl.White)
+						}
+					}
+				}
+			} else {
+				// Just draw a background color if texture failed to load
+				rl.ClearBackground(rl.DarkGray)
+			}
 
 			for _, x := range worldItems {
 				x.Render()
@@ -572,6 +615,12 @@ func main() {
 		}
 		lastTime = currentTime
 	}
+
+	// Unload textures before closing
+	rl.UnloadTexture(player.spriteLeft)
+	rl.UnloadTexture(player.spriteRight)
+	rl.UnloadTexture(backgroundTexture) // Unload background texture
+	UnloadEnemySprite()
 
 	rl.CloseWindow()
 }

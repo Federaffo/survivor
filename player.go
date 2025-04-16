@@ -22,6 +22,11 @@ type player struct {
 	lookAt    rl.Vector2
 	lookAtSet bool
 
+	// Player sprite textures
+	spriteLeft  rl.Texture2D
+	spriteRight rl.Texture2D
+	facingLeft  bool // Track player direction for sprite selection
+
 	// Weapon pickup notification
 	weaponPickupTime float64
 	weaponPickupName string
@@ -51,6 +56,55 @@ var (
 var playerSpeed float32 = 300
 
 func NewPlayer(totalHp int) player {
+	// Load player sprites
+	var spriteLeft, spriteRight rl.Texture2D
+
+	// Try different possible paths for the sprites
+	paths := []string{
+		"player_left.png",
+		"assets/player_left.png",
+		"./player_left.png",
+		"../player_left.png",
+	}
+
+	// Print working directory for debugging
+	rl.TraceLog(rl.LogWarning, "Loading player sprites...")
+
+	spriteLoaded := false
+	for _, path := range paths {
+		// Try to load the left sprite
+		spriteLeft = rl.LoadTexture(path)
+
+		// Check if left sprite loaded successfully
+		if spriteLeft.ID > 0 {
+			// Now try to load the right sprite
+			rightPath := ""
+
+			if path == "player_left.png" {
+				rightPath = "player_right.png"
+			} else if path == "assets/player_left.png" {
+				rightPath = "assets/player_right.png"
+			} else if path == "./player_left.png" {
+				rightPath = "./player_right.png"
+			} else if path == "../player_left.png" {
+				rightPath = "../player_right.png"
+			}
+
+			spriteRight = rl.LoadTexture(rightPath)
+
+			// Check if right texture loaded successfully
+			if spriteRight.ID > 0 {
+				rl.TraceLog(rl.LogInfo, "Successfully loaded sprites from %s and %s", path, rightPath)
+				spriteLoaded = true
+				break
+			}
+		}
+	}
+
+	if !spriteLoaded {
+		rl.TraceLog(rl.LogWarning, "Failed to load player sprites! Will use fallback circle.")
+	}
+
 	return player{
 		TotalHp:          totalHp,
 		CurrentHp:        totalHp,
@@ -66,6 +120,9 @@ func NewPlayer(totalHp int) player {
 		ammoPickupTime:   0,
 		ammoPickupAmount: 0,
 		grenades:         3, // Start with 3 grenades
+		spriteLeft:       spriteLeft,
+		spriteRight:      spriteRight,
+		facingLeft:       false,
 	}
 }
 
@@ -76,20 +133,30 @@ func (p *player) LookAt(lookAt rl.Vector2) {
 
 func (p *player) Update(dt float64, currentTime float64) {
 	dtSpeed := playerSpeed * float32(dt)
+
+	// Track movement for sprite direction
+	moving := false
+
 	if rl.IsKeyDown(rl.KeyA) {
 		p.Pos.X -= dtSpeed
+		p.facingLeft = true
+		moving = true
 	}
 
 	if rl.IsKeyDown(rl.KeyD) {
 		p.Pos.X += dtSpeed
+		p.facingLeft = false
+		moving = true
 	}
 
 	if rl.IsKeyDown(rl.KeyS) {
 		p.Pos.Y += dtSpeed
+		moving = true
 	}
 
 	if rl.IsKeyDown(rl.KeyW) {
 		p.Pos.Y -= dtSpeed
+		moving = true
 	}
 
 	// Handle reload key press
@@ -122,9 +189,57 @@ func (p *player) Update(dt float64, currentTime float64) {
 			}
 		}
 	}
+
+	// Determine sprite direction based on mouse position if not moving
+	if !moving && p.lookAtSet {
+		// If looking more left than right, face left
+		if p.lookAt.X < 0 {
+			p.facingLeft = true
+		} else {
+			p.facingLeft = false
+		}
+	}
 }
 
 func (p *player) Render() {
+	// Check if sprites were loaded successfully
+	spritesLoaded := p.spriteLeft.ID > 0 && p.spriteRight.ID > 0
+
+	if spritesLoaded {
+		// Render player sprite
+		sprite := p.spriteRight
+		if p.facingLeft {
+			sprite = p.spriteLeft
+		}
+
+		// Size to draw the sprite (scale it according to playerSize)
+		spriteScale := playerSize / float32(sprite.Height) * 4.0
+		width := float32(sprite.Width) * spriteScale
+		height := float32(sprite.Height) * spriteScale
+
+		// Draw the sprite centered on player position
+		rl.DrawTexturePro(
+			sprite,
+			rl.NewRectangle(0, 0, float32(sprite.Width), float32(sprite.Height)),
+			rl.NewRectangle(p.Pos.X-width/2, p.Pos.Y-height/2, width, height),
+			rl.NewVector2(0, 0),
+			0,
+			rl.White,
+		)
+
+		// Draw health bar above player
+		healthBarY := p.Pos.Y - height/2 - 10
+		drawHealthBar(p, healthBarY)
+	} else {
+		// Fallback to circle if sprites not loaded
+		rl.DrawCircle(int32(p.Pos.X), int32(p.Pos.Y), playerSize*1.6, rl.Red)
+
+		// Draw health bar above circle
+		healthBarY := p.Pos.Y - playerSize*1.6 - 10
+		drawHealthBar(p, healthBarY)
+	}
+
+	// Draw direction indicator if needed
 	if p.lookAtSet {
 		directionRectangle := rl.NewRectangle(
 			p.Pos.X+p.lookAt.X*10,
@@ -135,17 +250,18 @@ func (p *player) Render() {
 		rotation := float32(math.Atan2(float64(p.lookAt.Y), float64(p.lookAt.X)) * 180 / math.Pi)
 		rl.DrawRectanglePro(directionRectangle, rl.NewVector2(0, 1), rotation, rl.Green)
 	}
-	rl.DrawCircle(int32(p.Pos.X), int32(p.Pos.Y), playerSize, rl.Red)
+}
 
-	// Draw health bar above player
-	healthBarWidth := playerSize * 2
-	healthBarHeight := 5.0
+// Helper function to draw health bar
+func drawHealthBar(p *player, yPosition float32) {
+	healthBarWidth := playerSize * 3 // Increased from 2 to 3 for wider health bar
+	healthBarHeight := 6.0           // Increased from 5.0 to 6.0 for taller health bar
 	healthPercentage := float32(p.CurrentHp) / float32(p.TotalHp)
 
 	// Background of health bar
 	rl.DrawRectangle(
 		int32(p.Pos.X-healthBarWidth/2),
-		int32(p.Pos.Y-playerSize-10),
+		int32(yPosition),
 		int32(healthBarWidth),
 		int32(healthBarHeight),
 		rl.DarkGray,
@@ -154,7 +270,7 @@ func (p *player) Render() {
 	// Actual health
 	rl.DrawRectangle(
 		int32(p.Pos.X-healthBarWidth/2),
-		int32(p.Pos.Y-playerSize-10),
+		int32(yPosition),
 		int32(healthBarWidth*healthPercentage),
 		int32(healthBarHeight),
 		rl.Red,
@@ -209,7 +325,10 @@ func (p *player) CheckCollision(other Collides) bool {
 	switch other.(type) {
 	case *Enemy:
 		enemy := other.(*Enemy)
-		return rl.CheckCollisionCircles(p.Pos, playerSize, enemy.pos, enemy.bodyRadius)
+		// Use a slightly smaller collision radius than the sprite size
+		// This makes the collision feel more fair
+		collisionRadius := playerSize * 0.7
+		return rl.CheckCollisionCircles(p.Pos, collisionRadius, enemy.pos, enemy.bodyRadius)
 	}
 	return false
 }
