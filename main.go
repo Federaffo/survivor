@@ -88,10 +88,12 @@ func main() {
 
 	var projList []*Projectile
 	var enemyList []*Enemy
+	var grenadeList []*Grenade
 	var worldItems []WorldItem
 	var worldBodies []Collides
 	var loots []*WeaponLoot
 	var ammoLoots []*AmmoLoot
+	var grenadePickups []*GrenadePickup
 
 	// Level system variables
 	currentLevel := 1
@@ -110,6 +112,11 @@ func main() {
 	ammoSpawnDelay := 3.0 // Spawn ammo every 3 seconds
 
 	lastShoot := lastTime
+	lastGrenade := lastTime
+	grenadeDelay := 1.0
+
+	lastGrenadePickupSpawn := lastTime
+	grenadePickupDelay := 10.0 // Spawn grenade pickup every 10 seconds
 
 	w = rl.GetMonitorWidth(display)
 	h = rl.GetMonitorHeight(display)
@@ -151,10 +158,12 @@ func main() {
 				player = NewPlayer(1000)
 				enemyList = make([]*Enemy, 0)
 				projList = make([]*Projectile, 0)
+				grenadeList = make([]*Grenade, 0)
 				worldItems = make([]WorldItem, 0)
 				worldBodies = make([]Collides, 0)
 				loots = make([]*WeaponLoot, 0)
 				ammoLoots = make([]*AmmoLoot, 0)
+				grenadePickups = make([]*GrenadePickup, 0)
 				currentLevel = 1
 				enemiesRemaining = getEnemiesForLevel(currentLevel)
 				enemiesInPlay = 0
@@ -307,6 +316,21 @@ func main() {
 			}
 		}
 
+		// Place grenade when 'E' is pressed
+		{
+			if rl.IsKeyPressed(rl.KeyE) && currentTime > lastGrenade+grenadeDelay && player.grenades > 0 {
+				lastGrenade = currentTime
+
+				// Create new grenade at player position
+				grenade := NewGrenade(player.Pos, currentTime)
+				grenadeList = append(grenadeList, grenade)
+				worldItems = append(worldItems, grenade)
+
+				// Decrease player's grenade count
+				player.grenades--
+			}
+		}
+
 		// Spawn enemies for current level
 		{
 			if !levelCompleted && enemiesRemaining > 0 && enemiesInPlay < maxConcurrentEnemies && currentTime > lastEnemySpawn+enemySpawnDelay {
@@ -349,10 +373,58 @@ func main() {
 		for _, p := range projList {
 			p.Update(dt)
 		}
-		// move enemy
 
+		// Update grenades
+		for _, g := range grenadeList {
+			g.Update(currentTime, enemyList)
+		}
+
+		// Check for enemies killed by grenades
+		for i := len(enemyList) - 1; i >= 0; i-- {
+			if enemyList[i].health <= 0 && !enemyList[i].destroyed {
+				enemyList[i].destroyed = true
+				enemiesInPlay--
+			}
+		}
+
+		// move enemy
 		for _, p := range enemyList {
 			p.Move(player.Pos, dt)
+		}
+
+		// Spawn grenade pickups
+		{
+			if currentTime > lastGrenadePickupSpawn+grenadePickupDelay {
+				lastGrenadePickupSpawn = currentTime
+
+				if rl.GetRandomValue(0, 100) < 40 { // 40% chance to spawn grenade pickup
+					x := rl.GetRandomValue(0, int32(w))
+					y := rl.GetRandomValue(0, int32(h))
+
+					pickup := NewGrenadePickup(rl.NewVector2(float32(x), float32(y)), currentTime)
+					worldItems = append(worldItems, pickup)
+					grenadePickups = append(grenadePickups, pickup)
+				}
+			}
+		}
+
+		// Check for grenades timeout (similar to ammo pickup timeout)
+		{
+			for i := len(grenadePickups) - 1; i >= 0; i-- {
+				// Check if this pickup has been around for more than 10 seconds
+				if currentTime-grenadePickups[i].createTime > 10.0 && !grenadePickups[i].destroyed {
+					grenadePickups[i].destroyed = true
+				}
+			}
+
+			// Handle grenade pickup
+			for _, g := range grenadePickups {
+				if !g.destroyed && rl.CheckCollisionCircleRec(player.Pos, playerSize,
+					rl.NewRectangle(g.pos.X, g.pos.Y, float32(g.size), float32(g.size))) {
+					player.grenades += g.amount
+					g.destroyed = true
+				}
+			}
 		}
 
 		type CollisionPair struct {
@@ -418,7 +490,7 @@ func main() {
 			if player.currentWeapon.usesAmmo {
 				ammoText = fmt.Sprintf("Ammo: %d / %d", player.currentMagazine, player.ammo)
 			} else {
-				ammoText = fmt.Sprintf("Ammo: ∞") // Infinite for pistol
+				ammoText = fmt.Sprintf("Ammo: ∞ / %d", player.ammo) // Infinite for pistol
 			}
 			ammoWidth := rl.MeasureText(ammoText, 20)
 			rl.DrawText(ammoText, int32(w)-ammoWidth-20, 50, 20, rl.White)
@@ -476,6 +548,16 @@ func main() {
 				textWidth := rl.MeasureText(ammoText, 30)
 				rl.DrawText(ammoText, int32(w)/2-textWidth/2, int32(h)-90, 30, rl.Yellow)
 			}
+
+			// Show grenade key hint
+			grenadeText := "Press E to place grenade"
+			grenadeWidth := rl.MeasureText(grenadeText, 18)
+			rl.DrawText(grenadeText, int32(w)-grenadeWidth-20, 140, 18, rl.Gray)
+
+			// Show grenade count
+			grenadeCountText := fmt.Sprintf("Grenades: %d", player.grenades)
+			grenadeCountWidth := rl.MeasureText(grenadeCountText, 20)
+			rl.DrawText(grenadeCountText, int32(w)-grenadeCountWidth-20, 170, 20, rl.White)
 		}
 		rl.EndDrawing()
 
@@ -485,6 +567,8 @@ func main() {
 			enemyList = UpdateWorldItems(enemyList)
 			loots = UpdateWorldItems(loots)
 			ammoLoots = UpdateWorldItems(ammoLoots)
+			grenadeList = UpdateWorldItems(grenadeList)
+			grenadePickups = UpdateWorldItems(grenadePickups)
 		}
 		lastTime = currentTime
 	}

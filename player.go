@@ -17,6 +17,8 @@ type player struct {
 	isReloading     bool    // Whether player is currently reloading
 	reloadStartTime float64 // When reload started
 
+	grenades int // Number of grenades player has
+
 	lookAt    rl.Vector2
 	lookAtSet bool
 
@@ -63,6 +65,7 @@ func NewPlayer(totalHp int) player {
 		isReloading:      false,
 		ammoPickupTime:   0,
 		ammoPickupAmount: 0,
+		grenades:         3, // Start with 3 grenades
 	}
 }
 
@@ -177,7 +180,7 @@ func (p *player) Shoot() []*Projectile {
 	// Only shoot if we have ammo in magazine
 	if p.currentMagazine > 0 || !p.currentWeapon.usesAmmo {
 		for i := 0; i < p.currentWeapon.nProj; i++ {
-			noise := rl.GetRandomValue(-50, 50)
+			noise := rl.GetRandomValue(-100, 100)
 			noisedDirection := rl.Vector2Add(rl.GetMousePosition(), rl.NewVector2(float32(noise), float32(noise)))
 			projs = append(projs, NewProj(p.Pos, noisedDirection, p.currentWeapon.projDamage))
 		}
