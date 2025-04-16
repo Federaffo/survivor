@@ -3,6 +3,9 @@
 A top-down zombie survival game built with Go and Raylib.
 
 
+![Survivor Game](assets/preview.png)
+
+
 ## Description
 
 Survivor is a 2D top-down shooter where you must fight off endless waves of zombies. The difficulty increases with each level as more zombies spawn with increased health and damage. How long can you survive?
