@@ -245,6 +245,20 @@ func (i *ImpactEffect) Destroyed() bool {
 	return i.destroyed
 }
 
+// Calculate enemy spawn delay for level
+func getEnemySpawnDelayForLevel(level int) float64 {
+	baseDelay := 1.0
+	decreasePerLevel := 0.1
+	minDelay := 0.3 // Minimum delay to prevent instant spawning
+
+	delay := baseDelay - float64(level-1)*decreasePerLevel
+	if delay < minDelay {
+		delay = minDelay
+	}
+
+	return delay
+}
+
 func main() {
 	display := rl.GetCurrentMonitor()
 
@@ -297,14 +311,14 @@ func main() {
 	currentLevel := 1
 	enemiesRemaining := getEnemiesForLevel(currentLevel)
 	enemiesInPlay := 0
-	maxConcurrentEnemies := 5 // Maximum enemies on screen at once
+	maxConcurrentEnemies := 199 // Maximum enemies on screen at once
 	levelCompleted := false
 	levelCompletedTime := 0.0
 	levelCompletedDuration := 2.0 // Show level complete message for 2 seconds
 
 	lastTime := rl.GetTime()
 	lastEnemySpawn := lastTime
-	enemySpawnDelay := 1.0 // Seconds between enemy spawns
+	enemySpawnDelay := getEnemySpawnDelayForLevel(currentLevel) // Initial spawn delay
 
 	lastAmmoSpawn := lastTime
 	ammoSpawnDelay := 3.0 // Spawn ammo every 3 seconds
@@ -456,6 +470,7 @@ func main() {
 				impacts = make([]*ImpactEffect, 0)
 				currentLevel = 1
 				enemiesRemaining = getEnemiesForLevel(currentLevel)
+				enemySpawnDelay = getEnemySpawnDelayForLevel(currentLevel) // Reset spawn delay
 				enemiesInPlay = 0
 				levelCompleted = false
 
@@ -478,6 +493,8 @@ func main() {
 			levelCompletedTime = currentTime
 			currentLevel++
 			enemiesRemaining = getEnemiesForLevel(currentLevel)
+			// Update spawn delay for the new level
+			enemySpawnDelay = getEnemySpawnDelayForLevel(currentLevel)
 		}
 
 		// Handle level transition
