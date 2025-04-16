@@ -72,16 +72,7 @@ func getEnemyDamageForLevel(level int) float32 {
 
 // Get the name of a weapon as a string
 func getWeaponName(w weapon) string {
-	if w == PISTOL {
-		return "Pistol"
-	} else if w == MITRA {
-		return "Mitra"
-	} else if w == SHOTGUN {
-		return "Shotgun"
-	} else if w == MINIGUN {
-		return "Minigun"
-	}
-	return "Unknown"
+	return w.weaponName
 }
 
 func main() {
@@ -100,6 +91,7 @@ func main() {
 	var worldItems []WorldItem
 	var worldBodies []Collides
 	var loots []*WeaponLoot
+	var ammoLoots []*AmmoLoot
 
 	// Level system variables
 	currentLevel := 1
@@ -113,6 +105,9 @@ func main() {
 	lastTime := rl.GetTime()
 	lastEnemySpawn := lastTime
 	enemySpawnDelay := 1.0 // Seconds between enemy spawns
+
+	lastAmmoSpawn := lastTime
+	ammoSpawnDelay := 3.0 // Spawn ammo every 3 seconds
 
 	lastShoot := lastTime
 
@@ -136,7 +131,7 @@ func main() {
 
 		mousePosition := rl.GetMousePosition()
 		player.LookAt(mousePosition)
-		player.Update(dt)
+		player.Update(dt, currentTime)
 
 		// Check if player is dead
 		if player.CurrentHp <= 0 {
@@ -159,6 +154,7 @@ func main() {
 				worldItems = make([]WorldItem, 0)
 				worldBodies = make([]Collides, 0)
 				loots = make([]*WeaponLoot, 0)
+				ammoLoots = make([]*AmmoLoot, 0)
 				currentLevel = 1
 				enemiesRemaining = getEnemiesForLevel(currentLevel)
 				enemiesInPlay = 0
@@ -215,6 +211,26 @@ func main() {
 			}
 		}
 
+		// Spawn ammo
+		{
+			if currentTime > lastAmmoSpawn+ammoSpawnDelay {
+				lastAmmoSpawn = currentTime
+
+				if rl.GetRandomValue(0, 100) < 30 { // 30% chance to spawn ammo
+					x := rl.GetRandomValue(0, int32(w))
+					y := rl.GetRandomValue(0, int32(h))
+
+					// Random ammo amount between 50-200
+					ammoAmount := rl.GetRandomValue(50, 200)
+
+					ammo := NewAmmoLoot(int(ammoAmount), rl.NewVector2(float32(x), float32(y)), currentTime)
+					worldBodies = append(worldBodies, ammo)
+					worldItems = append(worldItems, ammo)
+					ammoLoots = append(ammoLoots, ammo)
+				}
+			}
+		}
+
 		// Collision with loot
 		{
 			// Check for loot timeout (10 seconds)
@@ -228,11 +244,52 @@ func main() {
 			for _, l := range loots {
 				if rl.CheckCollisionCircleRec(player.Pos, playerSize, rl.NewRectangle(l.pos.X, l.pos.Y, lootSize, lootSize)) {
 					player.currentWeapon = l.weapon
+					player.isReloading = false // Cancel any reload in progress
+
+					// Initialize magazine for the new weapon
+					if player.currentWeapon.usesAmmo {
+						// If we have enough ammo, fill the magazine
+						if player.ammo >= player.currentWeapon.magazineSize {
+							player.currentMagazine = player.currentWeapon.magazineSize
+							player.ammo -= player.currentWeapon.magazineSize
+						} else {
+							// Otherwise use what we have
+							player.currentMagazine = player.ammo
+							player.ammo = 0
+						}
+					} else {
+						// Pistol always has full magazine
+						player.currentMagazine = player.currentWeapon.magazineSize
+					}
+
 					l.destroyed = true
 
 					// Store pickup message details
 					player.weaponPickupTime = currentTime
 					player.weaponPickupName = getWeaponName(l.weapon)
+				}
+			}
+		}
+
+		// Collision with ammo
+		{
+			// Check for ammo timeout (10 seconds)
+			for i := len(ammoLoots) - 1; i >= 0; i-- {
+				// Check if this ammo has been around for more than 10 seconds
+				if currentTime-ammoLoots[i].createTime > 10.0 && !ammoLoots[i].destroyed {
+					ammoLoots[i].destroyed = true
+				}
+			}
+
+			// Handle ammo pickup
+			for _, a := range ammoLoots {
+				if !a.destroyed && rl.CheckCollisionCircleRec(player.Pos, playerSize, rl.NewRectangle(a.pos.X, a.pos.Y, lootSize, lootSize)) {
+					player.ammo += a.amount
+					a.destroyed = true
+
+					// Store pickup message details
+					player.ammoPickupTime = currentTime
+					player.ammoPickupAmount = a.amount
 				}
 			}
 		}
@@ -356,6 +413,38 @@ func main() {
 			textWidth := rl.MeasureText(healthText, 20)
 			rl.DrawText(healthText, int32(w)-textWidth-20, 20, 20, rl.White)
 
+			// Draw ammo count
+			var ammoText string
+			if player.currentWeapon.usesAmmo {
+				ammoText = fmt.Sprintf("Ammo: %d / %d", player.currentMagazine, player.ammo)
+			} else {
+				ammoText = fmt.Sprintf("Ammo: ∞") // Infinite for pistol
+			}
+			ammoWidth := rl.MeasureText(ammoText, 20)
+			rl.DrawText(ammoText, int32(w)-ammoWidth-20, 50, 20, rl.White)
+
+			// Show current weapon
+			weaponText := fmt.Sprintf("Weapon: %s", player.currentWeapon.weaponName)
+			weaponWidth := rl.MeasureText(weaponText, 20)
+			rl.DrawText(weaponText, int32(w)-weaponWidth-20, 80, 20, rl.White)
+
+			// Show reload key hint if magazine not full
+			if player.currentMagazine < player.currentWeapon.magazineSize &&
+				!player.isReloading &&
+				(player.ammo > 0 || !player.currentWeapon.usesAmmo) {
+				reloadText := "Press R to reload"
+				reloadWidth := rl.MeasureText(reloadText, 18)
+				rl.DrawText(reloadText, int32(w)-reloadWidth-20, 110, 18, rl.Gray)
+			}
+
+			// Show reload state if reloading
+			if player.isReloading {
+				reloadProgress := (currentTime - player.reloadStartTime) / player.currentWeapon.reloadTime * 100
+				reloadText := fmt.Sprintf("RELOADING... %.0f%%", reloadProgress)
+				reloadWidth := rl.MeasureText(reloadText, 25)
+				rl.DrawText(reloadText, int32(w)/2-reloadWidth/2, int32(h)-120, 25, rl.Yellow)
+			}
+
 			// Draw level information
 			levelText := fmt.Sprintf("Level: %d", currentLevel)
 			rl.DrawText(levelText, 10, 40, 20, rl.White)
@@ -380,6 +469,13 @@ func main() {
 				textWidth := rl.MeasureText(pickupText, 30)
 				rl.DrawText(pickupText, int32(w)/2-textWidth/2, int32(h)-50, 30, rl.Yellow)
 			}
+
+			// Show ammo pickup message for 2 seconds
+			if player.ammoPickupAmount > 0 && currentTime-player.ammoPickupTime < 2.0 {
+				ammoText := fmt.Sprintf("Ammo +%d", player.ammoPickupAmount)
+				textWidth := rl.MeasureText(ammoText, 30)
+				rl.DrawText(ammoText, int32(w)/2-textWidth/2, int32(h)-90, 30, rl.Yellow)
+			}
 		}
 		rl.EndDrawing()
 
@@ -387,6 +483,8 @@ func main() {
 			worldItems = UpdateWorldItems(worldItems)
 			projList = UpdateWorldItems(projList)
 			enemyList = UpdateWorldItems(enemyList)
+			loots = UpdateWorldItems(loots)
+			ammoLoots = UpdateWorldItems(ammoLoots)
 		}
 		lastTime = currentTime
 	}
