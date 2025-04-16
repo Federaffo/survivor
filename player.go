@@ -140,6 +140,39 @@ func (p *player) Update(dt float64, currentTime float64) {
 		moving = true
 	}
 
+	// Screen boundaries - get current screen dimensions
+	screenWidth := float32(rl.GetScreenWidth())
+	screenHeight := float32(rl.GetScreenHeight())
+
+	// Calculate player's effective size (taking into account the sprite scaling)
+	var playerBoundarySize float32
+	spritesLoaded := p.spriteLeft.ID > 0 && p.spriteRight.ID > 0
+	if spritesLoaded {
+		// Use the standard size for boundary calculations
+		playerBoundarySize = playerSize * 1.6 // A bit smaller than the actual sprite for better feel
+	} else {
+		// Fallback circle size
+		playerBoundarySize = playerSize * 1.6
+	}
+
+	// Apply boundary constraints
+	// Left boundary
+	if p.Pos.X < playerBoundarySize {
+		p.Pos.X = playerBoundarySize
+	}
+	// Right boundary
+	if p.Pos.X > screenWidth-playerBoundarySize {
+		p.Pos.X = screenWidth - playerBoundarySize
+	}
+	// Top boundary
+	if p.Pos.Y < playerBoundarySize {
+		p.Pos.Y = playerBoundarySize
+	}
+	// Bottom boundary
+	if p.Pos.Y > screenHeight-playerBoundarySize {
+		p.Pos.Y = screenHeight - playerBoundarySize
+	}
+
 	// Handle reload key press
 	if rl.IsKeyPressed(rl.KeyR) {
 		p.Reload(currentTime)
