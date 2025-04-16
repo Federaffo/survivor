@@ -259,6 +259,34 @@ func getEnemySpawnDelayForLevel(level int) float64 {
 	return delay
 }
 
+// Add game statistics struct
+type GameStats struct {
+	levelReached   int
+	enemiesKilled  int
+	shotsFired     int
+	damageDealt    float32
+	timeAlive      float64
+	grenadesThrown int
+}
+
+// Initialize game stats
+var gameStats GameStats
+
+// Reset the game stats
+func resetGameStats() {
+	gameStats = GameStats{
+		levelReached:   1,
+		enemiesKilled:  0,
+		shotsFired:     0,
+		damageDealt:    0,
+		timeAlive:      0,
+		grenadesThrown: 0,
+	}
+}
+
+// Add a flag to track if game is over
+var gameOver bool = false
+
 func main() {
 	display := rl.GetCurrentMonitor()
 
@@ -364,6 +392,13 @@ func main() {
 	// Update global blocks reference for enemy collision
 	UpdateGlobalBlocks(blocks)
 
+	// Initialize game stats and reset game over flag
+	resetGameStats()
+	gameOver = false
+
+	// Track game start time
+	gameStartTime := rl.GetTime()
+
 	for !rl.WindowShouldClose() {
 		currentTime := rl.GetTime()
 		dt := currentTime - lastTime
@@ -445,21 +480,65 @@ func main() {
 		// Only call the parts of Update that don't involve movement
 		player.UpdateWithoutMovement(dt, currentTime)
 
+		// Update time alive only if game is not over
+		if !gameOver {
+			gameStats.timeAlive = currentTime - gameStartTime
+		}
+
 		// Check if player is dead
 		if player.CurrentHp <= 0 {
+			// Set game over flag to stop time counting
+			if !gameOver {
+				gameOver = true
+				// Freeze time alive at the moment of death
+				gameStats.timeAlive = currentTime - gameStartTime
+			}
+
 			rl.BeginDrawing()
 			rl.ClearBackground(rl.Black)
+
+			// Game over title
 			gameOverText := "GAME OVER"
 			textWidth := rl.MeasureText(gameOverText, 60)
-			rl.DrawText(gameOverText, int32(w)/2-textWidth/2, int32(h)/2-30, 60, rl.Red)
+			rl.DrawText(gameOverText, int32(w)/2-textWidth/2, int32(h)/4, 60, rl.Red)
 
+			// Display statistics
+			statsY := int32(h)/4 + 100
+			statsSpacing := int32(35)
+
+			// Format time alive as minutes:seconds
+			minutes := int(gameStats.timeAlive) / 60
+			seconds := int(gameStats.timeAlive) % 60
+			timeAliveText := fmt.Sprintf("Time Survived: %d:%02d", minutes, seconds)
+
+			// Draw all stats
+			statsText := []string{
+				fmt.Sprintf("Level Reached: %d", gameStats.levelReached),
+				fmt.Sprintf("Enemies Killed: %d", gameStats.enemiesKilled),
+				fmt.Sprintf("Shots Fired: %d", gameStats.shotsFired),
+				fmt.Sprintf("Damage Dealt: %.0f", gameStats.damageDealt),
+				timeAliveText,
+				fmt.Sprintf("Grenades Thrown: %d", gameStats.grenadesThrown),
+			}
+
+			for i, text := range statsText {
+				textWidth := rl.MeasureText(text, 30)
+				rl.DrawText(text, int32(w)/2-textWidth/2, statsY+int32(i)*statsSpacing, 30, rl.Gold)
+			}
+
+			// Restart prompt
 			restartText := "Press R to restart"
 			restartWidth := rl.MeasureText(restartText, 30)
-			rl.DrawText(restartText, int32(w)/2-restartWidth/2, int32(h)/2+40, 30, rl.White)
+			rl.DrawText(restartText, int32(w)/2-restartWidth/2, int32(h)*3/4, 30, rl.White)
+
 			rl.EndDrawing()
 
 			if rl.IsKeyPressed(rl.KeyR) {
 				// Reset the game
+				resetGameStats()
+				gameStartTime = rl.GetTime() // Reset game time
+				gameOver = false             // Reset game over flag
+
 				player = NewPlayer(1000)
 				enemyList = make([]*Enemy, 0)
 				projList = make([]*Projectile, 0)
@@ -498,6 +577,7 @@ func main() {
 			levelCompleted = true
 			levelCompletedTime = currentTime
 			currentLevel++
+			gameStats.levelReached = currentLevel // Update level reached in stats
 			enemiesRemaining = getEnemiesForLevel(currentLevel)
 			// Update spawn delay for the new level
 			enemySpawnDelay = getEnemySpawnDelayForLevel(currentLevel)
@@ -631,7 +711,9 @@ func main() {
 			if rl.IsMouseButtonDown(0) {
 				if currentTime > player.currentWeapon.shootingDelay+float64(lastShoot) {
 					lastShoot = currentTime
-					for _, p := range player.Shoot() {
+					shots := player.Shoot()
+					gameStats.shotsFired += len(shots) // Track shots fired
+					for _, p := range shots {
 						projList = append(projList, p)
 						worldItems = append(worldItems, p)
 					}
@@ -643,6 +725,7 @@ func main() {
 		{
 			if rl.IsKeyPressed(rl.KeyE) && currentTime > lastGrenade+grenadeDelay && player.grenades > 0 {
 				lastGrenade = currentTime
+				gameStats.grenadesThrown++ // Track grenades thrown
 
 				// Create new grenade at player position
 				grenade := NewGrenade(player.Pos, currentTime)
@@ -717,6 +800,7 @@ func main() {
 			if enemyList[i].health <= 0 && !enemyList[i].destroyed {
 				enemyList[i].destroyed = true
 				enemiesInPlay--
+				gameStats.enemiesKilled++ // Count enemy killed
 
 				// Add blood at enemy position when it dies from projectile hit
 				blood := NewBlood(enemyList[i].pos)
@@ -805,9 +889,11 @@ func main() {
 			for _, e := range enemyList {
 				if rl.CheckCollisionCircles(p.pos, projSize, e.pos, enemySize) {
 					e.DealDamage(p.damage)
+					gameStats.damageDealt += p.damage // Track damage dealt
 					if e.health <= 0 {
 						e.destroyed = true
 						enemiesInPlay--
+						gameStats.enemiesKilled++ // Count enemy killed
 
 						// Add blood at enemy position when it dies from projectile hit
 						blood := NewBlood(e.pos)
