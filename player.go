@@ -15,29 +15,38 @@ type player struct {
 
 	lookAt    rl.Vector2
 	lookAtSet bool
+
+	// Weapon pickup notification
+	weaponPickupTime float64
+	weaponPickupName string
 }
 
 type weapon struct {
+	weaponName    string
 	shootingDelay float64
 	projDamage    float32
 	nProj         int
 }
 
 var (
-	PISTOL weapon = weapon{shootingDelay: 0.5, projDamage: 50, nProj: 1}
-	MITRA  weapon = weapon{shootingDelay: 0.1, projDamage: 500, nProj: 1}
+	PISTOL  weapon = weapon{shootingDelay: 0.5, projDamage: 50, nProj: 1, weaponName: "Pistol"}
+	MITRA   weapon = weapon{shootingDelay: 0.1, projDamage: 500, nProj: 1, weaponName: "Mitra"}
+	SHOTGUN weapon = weapon{shootingDelay: 0.8, projDamage: 30, nProj: 5, weaponName: "Shotgun"}  // Shoots multiple projectiles
+	MINIGUN weapon = weapon{shootingDelay: 0.05, projDamage: 15, nProj: 1, weaponName: "Minigun"} // Very fast firing rate
 )
 
 var playerSpeed float32 = 300
 
 func NewPlayer(totalHp int) player {
 	return player{
-		TotalHp:       totalHp,
-		CurrentHp:     totalHp,
-		Pos:           rl.NewVector2(200, 200),
-		lookAt:        rl.NewVector2(0, 0),
-		currentWeapon: PISTOL,
-		lookAtSet:     false,
+		TotalHp:          totalHp,
+		CurrentHp:        totalHp,
+		Pos:              rl.NewVector2(200, 200),
+		lookAt:           rl.NewVector2(0, 0),
+		currentWeapon:    PISTOL,
+		lookAtSet:        false,
+		weaponPickupName: "",
+		weaponPickupTime: 0,
 	}
 }
 

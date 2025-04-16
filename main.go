@@ -70,6 +70,20 @@ func getEnemyDamageForLevel(level int) float32 {
 	return baseDamage + float32(level-1)*damageIncreasePerLevel
 }
 
+// Get the name of a weapon as a string
+func getWeaponName(w weapon) string {
+	if w == PISTOL {
+		return "Pistol"
+	} else if w == MITRA {
+		return "Mitra"
+	} else if w == SHOTGUN {
+		return "Shotgun"
+	} else if w == MINIGUN {
+		return "Minigun"
+	}
+	return "Unknown"
+}
+
 func main() {
 	display := rl.GetCurrentMonitor()
 
@@ -177,19 +191,48 @@ func main() {
 			if rl.GetRandomValue(0, 1000) < 3 {
 				x := rl.GetRandomValue(0, int32(w))
 				y := rl.GetRandomValue(0, int32(h))
-				w := NewWeaponLoot(MITRA, rl.NewVector2(float32(x), float32(y)))
-				worldBodies = append(worldBodies, w)
-				worldItems = append(worldItems, w)
-				loots = append(loots, w)
+
+				// Pick a random weapon
+				weaponType := rl.GetRandomValue(0, 3)
+				var selectedWeapon weapon
+				switch weaponType {
+				case 0:
+					selectedWeapon = PISTOL
+				case 1:
+					selectedWeapon = MITRA
+				case 2:
+					selectedWeapon = SHOTGUN
+				case 3:
+					selectedWeapon = MINIGUN
+				default:
+					selectedWeapon = PISTOL
+				}
+
+				loot := NewWeaponLoot(selectedWeapon, rl.NewVector2(float32(x), float32(y)), currentTime)
+				worldBodies = append(worldBodies, loot)
+				worldItems = append(worldItems, loot)
+				loots = append(loots, loot)
 			}
 		}
 
 		// Collision with loot
 		{
+			// Check for loot timeout (10 seconds)
+			for i := len(loots) - 1; i >= 0; i-- {
+				// Check if this loot has been around for more than 10 seconds
+				if currentTime-loots[i].createTime > 10.0 && !loots[i].destroyed {
+					loots[i].destroyed = true
+				}
+			}
+
 			for _, l := range loots {
 				if rl.CheckCollisionCircleRec(player.Pos, playerSize, rl.NewRectangle(l.pos.X, l.pos.Y, lootSize, lootSize)) {
 					player.currentWeapon = l.weapon
 					l.destroyed = true
+
+					// Store pickup message details
+					player.weaponPickupTime = currentTime
+					player.weaponPickupName = getWeaponName(l.weapon)
 				}
 			}
 		}
@@ -329,6 +372,13 @@ func main() {
 				nextLevelText := fmt.Sprintf("NEXT LEVEL: %d", currentLevel)
 				nextLevelWidth := rl.MeasureText(nextLevelText, 30)
 				rl.DrawText(nextLevelText, int32(w)/2-nextLevelWidth/2, int32(h)/2+30, 30, rl.Green)
+			}
+
+			// Show weapon pickup message for 2 seconds
+			if player.weaponPickupName != "" && currentTime-player.weaponPickupTime < 2.0 {
+				pickupText := fmt.Sprintf("Acquired: %s", player.weaponPickupName)
+				textWidth := rl.MeasureText(pickupText, 30)
+				rl.DrawText(pickupText, int32(w)/2-textWidth/2, int32(h)-50, 30, rl.Yellow)
 			}
 		}
 		rl.EndDrawing()
