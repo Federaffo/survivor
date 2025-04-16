@@ -18,12 +18,79 @@ var (
 	projSize          float32
 	lootSize          float32
 	backgroundTexture rl.Texture2D // Background texture
+	bloodTexture      rl.Texture2D // Blood texture
 )
 
 type WorldItem interface {
 	Render()
 	// Update()
 	Destroyed() bool
+}
+
+type Blood struct {
+	pos       rl.Vector2
+	destroyed bool
+	rotation  float32
+	scale     float32
+	opacity   float32
+	fading    bool
+}
+
+func NewBlood(pos rl.Vector2) *Blood {
+	// Random rotation between 0-360 degrees for variation
+	rotation := float32(rl.GetRandomValue(0, 359))
+	// Random scale between 0.8 and 1.2 for size variation
+	scale := 0.8 + float32(rl.GetRandomValue(0, 40))/100.0
+	// Full opacity
+	opacity := float32(1.0)
+
+	return &Blood{
+		pos:       pos,
+		destroyed: false,
+		rotation:  rotation,
+		scale:     scale,
+		opacity:   opacity,
+		fading:    false,
+	}
+}
+
+func (b *Blood) Update(dt float64) {
+	if b.fading {
+		// Fade out gradually when level ends
+		fadeSpeed := float32(dt) * 0.5 // Adjust speed as needed
+		b.opacity -= fadeSpeed
+
+		if b.opacity <= 0 {
+			b.opacity = 0
+			b.destroyed = true
+		}
+	}
+}
+
+func (b *Blood) Render() {
+	if bloodTexture.ID > 0 {
+		// Size to draw the blood
+		baseSize := float32(50)
+		width := baseSize * b.scale
+		height := baseSize * b.scale
+
+		// Draw the blood sprite with rotation and transparency
+		rl.DrawTexturePro(
+			bloodTexture,
+			rl.NewRectangle(0, 0, float32(bloodTexture.Width), float32(bloodTexture.Height)),
+			rl.NewRectangle(b.pos.X-width/2, b.pos.Y-height/2, width, height),
+			rl.NewVector2(width/2, height/2),
+			b.rotation,
+			rl.ColorAlpha(rl.White, b.opacity),
+		)
+	} else {
+		// Fallback if texture not loaded
+		rl.DrawCircle(int32(b.pos.X), int32(b.pos.Y), 10, rl.ColorAlpha(rl.Maroon, b.opacity))
+	}
+}
+
+func (b *Blood) Destroyed() bool {
+	return b.destroyed
 }
 
 func RemoveIndex[T any](s []T, index int) []T {
@@ -53,7 +120,7 @@ func RandomPointInCircle(radius float32) rl.Vector2 {
 // Calculate enemies for level: base amount + level increment
 func getEnemiesForLevel(level int) int {
 	baseEnemies := 5
-	enemiesPerLevel := 2
+	enemiesPerLevel := 5
 	return baseEnemies + (level-1)*enemiesPerLevel
 }
 
@@ -98,6 +165,10 @@ func main() {
 	backgroundTexture = rl.LoadTexture("assets/background-dark.png")
 	rl.TraceLog(rl.LogInfo, "Loaded background texture: %dx%d", backgroundTexture.Width, backgroundTexture.Height)
 
+	// Load blood texture
+	bloodTexture = rl.LoadTexture("assets/blod.png")
+	rl.TraceLog(rl.LogInfo, "Loaded blood texture: %dx%d", bloodTexture.Width, bloodTexture.Height)
+
 	// Check if texture loaded correctly
 	if backgroundTexture.Width == 0 || backgroundTexture.Height == 0 {
 		rl.TraceLog(rl.LogError, "Failed to load background texture or dimensions are zero")
@@ -116,6 +187,7 @@ func main() {
 	var loots []*WeaponLoot
 	var ammoLoots []*AmmoLoot
 	var grenadePickups []*GrenadePickup
+	var bloodList []*Blood
 
 	// Level system variables
 	currentLevel := 1
@@ -186,6 +258,7 @@ func main() {
 				loots = make([]*WeaponLoot, 0)
 				ammoLoots = make([]*AmmoLoot, 0)
 				grenadePickups = make([]*GrenadePickup, 0)
+				bloodList = make([]*Blood, 0)
 				currentLevel = 1
 				enemiesRemaining = getEnemiesForLevel(currentLevel)
 				enemiesInPlay = 0
@@ -210,26 +283,29 @@ func main() {
 			// Reset when transition time is over
 			if currentTime > levelCompletedTime+levelCompletedDuration {
 				levelCompleted = false
+
+				// Start fading out all blood when level ends
+				for i := range bloodList {
+					bloodList[i].fading = true
+				}
 			}
 		}
 
 		// Spawn weapon
 		{
-			if rl.GetRandomValue(0, 1000) < 3 {
+			if rl.GetRandomValue(0, 1000) < 1 {
 				x := rl.GetRandomValue(0, int32(w))
 				y := rl.GetRandomValue(0, int32(h))
 
 				// Pick a random weapon
-				weaponType := rl.GetRandomValue(0, 3)
+				weaponType := rl.GetRandomValue(0, 2)
 				var selectedWeapon weapon
 				switch weaponType {
 				case 0:
-					selectedWeapon = PISTOL
-				case 1:
 					selectedWeapon = MITRA
-				case 2:
+				case 1:
 					selectedWeapon = SHOTGUN
-				case 3:
+				case 2:
 					selectedWeapon = MINIGUN
 				default:
 					selectedWeapon = PISTOL
@@ -406,6 +482,11 @@ func main() {
 			if enemyList[i].health <= 0 && !enemyList[i].destroyed {
 				enemyList[i].destroyed = true
 				enemiesInPlay--
+
+				// Add blood at enemy position when it dies from projectile hit
+				blood := NewBlood(enemyList[i].pos)
+				worldItems = append(worldItems, blood)
+				bloodList = append(bloodList, blood)
 			}
 		}
 
@@ -466,6 +547,11 @@ func main() {
 					if e.health <= 0 {
 						e.destroyed = true
 						enemiesInPlay--
+
+						// Add blood at enemy position when it dies from projectile hit
+						blood := NewBlood(e.pos)
+						worldItems = append(worldItems, blood)
+						bloodList = append(bloodList, blood)
 					}
 					p.destroyed = true
 				}
@@ -519,8 +605,16 @@ func main() {
 				rl.ClearBackground(rl.DarkGray)
 			}
 
-			for _, x := range worldItems {
-				x.Render()
+			// Draw blood first (so it's underneath everything else)
+			for _, blood := range bloodList {
+				blood.Render()
+			}
+
+			// Then draw other world items (but skip blood which we already drew)
+			for _, item := range worldItems {
+				if _, isBlood := item.(*Blood); !isBlood {
+					item.Render()
+				}
 			}
 
 			player.Render()
@@ -615,6 +709,12 @@ func main() {
 			ammoLoots = UpdateWorldItems(ammoLoots)
 			grenadeList = UpdateWorldItems(grenadeList)
 			grenadePickups = UpdateWorldItems(grenadePickups)
+
+			// Update blood (for fading effect)
+			for _, blood := range bloodList {
+				blood.Update(dt)
+			}
+			bloodList = UpdateWorldItems(bloodList)
 		}
 		lastTime = currentTime
 	}
@@ -622,7 +722,8 @@ func main() {
 	// Unload textures before closing
 	rl.UnloadTexture(player.spriteLeft)
 	rl.UnloadTexture(player.spriteRight)
-	rl.UnloadTexture(backgroundTexture) // Unload background texture
+	rl.UnloadTexture(backgroundTexture)
+	rl.UnloadTexture(bloodTexture)
 	UnloadEnemySprite()
 	UnloadBulletSprite()
 
