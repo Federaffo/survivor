@@ -91,8 +91,11 @@ func main() {
 	// Initialize enemy sprite
 	InitEnemySprite()
 
+	// Initialize bullet sprite
+	InitBulletSprite()
+
 	// Load background texture
-	backgroundTexture = rl.LoadTexture("assets/background.png")
+	backgroundTexture = rl.LoadTexture("assets/background-dark.png")
 	rl.TraceLog(rl.LogInfo, "Loaded background texture: %dx%d", backgroundTexture.Width, backgroundTexture.Height)
 
 	// Check if texture loaded correctly
@@ -143,7 +146,7 @@ func main() {
 	// have to be scaled based on screen size
 	playerSize = float32(w) / 120
 	projSize = float32(w) / 1000
-	enemySize = float32(w) / 200
+	enemySize = float32(w) / 120
 	lootSize = 60
 
 	spaceGrid := NewCollisionSpace(w, h, SPACE_GRID_WIDTH, SPACE_GRID_HEIGHT)
@@ -621,6 +624,7 @@ func main() {
 	rl.UnloadTexture(player.spriteRight)
 	rl.UnloadTexture(backgroundTexture) // Unload background texture
 	UnloadEnemySprite()
+	UnloadBulletSprite()
 
 	rl.CloseWindow()
 }
