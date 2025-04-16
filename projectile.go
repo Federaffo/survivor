@@ -15,25 +15,17 @@ var (
 // Initialize the bullet sprite
 func InitBulletSprite() {
 	// Try different possible paths for the bullet sprite
-	paths := []string{
-		"bullet.png",
-		"assets/bullet.png",
-		"./bullet.png",
-		"../bullet.png",
-	}
+	path := "assets/bullet.png"
 
 	// Print working directory for debugging
 	rl.TraceLog(rl.LogWarning, "Loading bullet sprite...")
 
-	for _, path := range paths {
-		// Try to load the sprite
-		bulletTexture = rl.LoadTexture(path)
+	// Try to load the sprite
+	bulletTexture = rl.LoadTexture(path)
 
-		// Check if sprite loaded successfully
-		if bulletTexture.ID > 0 {
-			rl.TraceLog(rl.LogInfo, "Successfully loaded bullet sprite from %s", path)
-			break
-		}
+	// Check if sprite loaded successfully
+	if bulletTexture.ID > 0 {
+		rl.TraceLog(rl.LogInfo, "Successfully loaded bullet sprite from %s", path)
 	}
 
 	if bulletTexture.ID == 0 {

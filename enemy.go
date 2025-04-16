@@ -10,25 +10,17 @@ var enemySprite rl.Texture2D // Single shared texture for all enemies
 // Initialize the enemy sprite
 func InitEnemySprite() {
 	// Try different possible paths for the zombie sprite
-	paths := []string{
-		"zombie.png",
-		"assets/zombie.png",
-		"./zombie.png",
-		"../zombie.png",
-	}
+	path := "assets/zombie.png"
 
 	// Print working directory for debugging
 	rl.TraceLog(rl.LogWarning, "Loading zombie sprite...")
 
-	for _, path := range paths {
-		// Try to load the sprite
-		enemySprite = rl.LoadTexture(path)
+	// Try to load the sprite
+	enemySprite = rl.LoadTexture(path)
 
-		// Check if sprite loaded successfully
-		if enemySprite.ID > 0 {
-			rl.TraceLog(rl.LogInfo, "Successfully loaded zombie sprite from %s", path)
-			break
-		}
+	// Check if sprite loaded successfully
+	if enemySprite.ID > 0 {
+		rl.TraceLog(rl.LogInfo, "Successfully loaded zombie sprite from %s", path)
 	}
 
 	if enemySprite.ID == 0 {

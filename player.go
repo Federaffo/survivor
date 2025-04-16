@@ -60,44 +60,25 @@ func NewPlayer(totalHp int) player {
 	var spriteLeft, spriteRight rl.Texture2D
 
 	// Try different possible paths for the sprites
-	paths := []string{
-		"player_left.png",
-		"assets/player_left.png",
-		"./player_left.png",
-		"../player_left.png",
-	}
+	path := "assets/player_left.png"
 
 	// Print working directory for debugging
 	rl.TraceLog(rl.LogWarning, "Loading player sprites...")
 
 	spriteLoaded := false
-	for _, path := range paths {
-		// Try to load the left sprite
-		spriteLeft = rl.LoadTexture(path)
+	// Try to load the left sprite
+	spriteLeft = rl.LoadTexture(path)
 
-		// Check if left sprite loaded successfully
-		if spriteLeft.ID > 0 {
-			// Now try to load the right sprite
-			rightPath := ""
+	// Check if left sprite loaded successfully
+	if spriteLeft.ID > 0 {
+		// Now try to load the right sprite
+		rightPath := "assets/player_right.png"
+		spriteRight = rl.LoadTexture(rightPath)
 
-			if path == "player_left.png" {
-				rightPath = "player_right.png"
-			} else if path == "assets/player_left.png" {
-				rightPath = "assets/player_right.png"
-			} else if path == "./player_left.png" {
-				rightPath = "./player_right.png"
-			} else if path == "../player_left.png" {
-				rightPath = "../player_right.png"
-			}
-
-			spriteRight = rl.LoadTexture(rightPath)
-
-			// Check if right texture loaded successfully
-			if spriteRight.ID > 0 {
-				rl.TraceLog(rl.LogInfo, "Successfully loaded sprites from %s and %s", path, rightPath)
-				spriteLoaded = true
-				break
-			}
+		// Check if right texture loaded successfully
+		if spriteRight.ID > 0 {
+			rl.TraceLog(rl.LogInfo, "Successfully loaded sprites from %s and %s", path, rightPath)
+			spriteLoaded = true
 		}
 	}
 
