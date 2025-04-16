@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+
 	rl "github.com/gen2brain/raylib-go/raylib"
 )
 
@@ -41,10 +43,31 @@ func UpdateWorldItems[T WorldItem](worldItems []T) []T {
 }
 
 func RandomPointInCircle(radius float32) rl.Vector2 {
-    x := float32(rl.GetRandomValue(-100, 100))
-    y := float32(rl.GetRandomValue(-100, 100))
-    vector := rl.Vector2Scale((rl.Vector2Normalize(rl.NewVector2(x, y))), radius)
-    return vector
+	x := float32(rl.GetRandomValue(-100, 100))
+	y := float32(rl.GetRandomValue(-100, 100))
+	vector := rl.Vector2Scale((rl.Vector2Normalize(rl.NewVector2(x, y))), radius)
+	return vector
+}
+
+// Calculate enemies for level: base amount + level increment
+func getEnemiesForLevel(level int) int {
+	baseEnemies := 5
+	enemiesPerLevel := 2
+	return baseEnemies + (level-1)*enemiesPerLevel
+}
+
+// Calculate enemy health for level
+func getEnemyHealthForLevel(level int) float32 {
+	baseHealth := float32(100)
+	healthIncreasePerLevel := float32(20)
+	return baseHealth + float32(level-1)*healthIncreasePerLevel
+}
+
+// Calculate enemy damage for level
+func getEnemyDamageForLevel(level int) float32 {
+	baseDamage := float32(10)
+	damageIncreasePerLevel := float32(5)
+	return baseDamage + float32(level-1)*damageIncreasePerLevel
 }
 
 func main() {
@@ -56,7 +79,7 @@ func main() {
 	rl.InitWindow(int32(w), int32(h), "Survivor")
 	rl.SetTargetFPS(60)
 
-	player := NewPlayer(100)
+	player := NewPlayer(1000)
 
 	var projList []*Projectile
 	var enemyList []*Enemy
@@ -64,11 +87,20 @@ func main() {
 	var worldBodies []Collides
 	var loots []*WeaponLoot
 
+	// Level system variables
+	currentLevel := 1
+	enemiesRemaining := getEnemiesForLevel(currentLevel)
+	enemiesInPlay := 0
+	maxConcurrentEnemies := 5 // Maximum enemies on screen at once
+	levelCompleted := false
+	levelCompletedTime := 0.0
+	levelCompletedDuration := 2.0 // Show level complete message for 2 seconds
+
 	lastTime := rl.GetTime()
+	lastEnemySpawn := lastTime
+	enemySpawnDelay := 1.0 // Seconds between enemy spawns
 
 	lastShoot := lastTime
-	lastSpawn := lastTime
-	spawnRate := 0.05
 
 	w = rl.GetMonitorWidth(display)
 	h = rl.GetMonitorHeight(display)
@@ -81,6 +113,9 @@ func main() {
 
 	spaceGrid := NewCollisionSpace(w, h, SPACE_GRID_WIDTH, SPACE_GRID_HEIGHT)
 
+	// Add player to worldBodies so it can be used for collisions
+	worldBodies = append(worldBodies, &player)
+
 	for !rl.WindowShouldClose() {
 		currentTime := rl.GetTime()
 		dt := currentTime - lastTime
@@ -88,6 +123,54 @@ func main() {
 		mousePosition := rl.GetMousePosition()
 		player.LookAt(mousePosition)
 		player.Update(dt)
+
+		// Check if player is dead
+		if player.CurrentHp <= 0 {
+			rl.BeginDrawing()
+			rl.ClearBackground(rl.Black)
+			gameOverText := "GAME OVER"
+			textWidth := rl.MeasureText(gameOverText, 60)
+			rl.DrawText(gameOverText, int32(w)/2-textWidth/2, int32(h)/2-30, 60, rl.Red)
+
+			restartText := "Press R to restart"
+			restartWidth := rl.MeasureText(restartText, 30)
+			rl.DrawText(restartText, int32(w)/2-restartWidth/2, int32(h)/2+40, 30, rl.White)
+			rl.EndDrawing()
+
+			if rl.IsKeyPressed(rl.KeyR) {
+				// Reset the game
+				player = NewPlayer(1000)
+				enemyList = make([]*Enemy, 0)
+				projList = make([]*Projectile, 0)
+				worldItems = make([]WorldItem, 0)
+				worldBodies = make([]Collides, 0)
+				loots = make([]*WeaponLoot, 0)
+				currentLevel = 1
+				enemiesRemaining = getEnemiesForLevel(currentLevel)
+				enemiesInPlay = 0
+				levelCompleted = false
+				worldBodies = append(worldBodies, &player)
+			}
+
+			lastTime = currentTime
+			continue
+		}
+
+		// Check if level is completed
+		if len(enemyList) == 0 && enemiesRemaining == 0 && !levelCompleted {
+			levelCompleted = true
+			levelCompletedTime = currentTime
+			currentLevel++
+			enemiesRemaining = getEnemiesForLevel(currentLevel)
+		}
+
+		// Handle level transition
+		if levelCompleted {
+			// Reset when transition time is over
+			if currentTime > levelCompletedTime+levelCompletedDuration {
+				levelCompleted = false
+			}
+		}
 
 		// Spawn weapon
 		{
@@ -124,35 +207,39 @@ func main() {
 			}
 		}
 
-		// Spwan enemys
+		// Spawn enemies for current level
 		{
-			if currentTime > lastSpawn+float64(spawnRate) {
-				lastSpawn = currentTime
+			if !levelCompleted && enemiesRemaining > 0 && enemiesInPlay < maxConcurrentEnemies && currentTime > lastEnemySpawn+enemySpawnDelay {
+				lastEnemySpawn = currentTime
 
 				respawn := true
-				n := NewEnemy(rl.NewVector2(100,110), 100, 10, enemySize)
-				for respawn{
+				enemyHealth := getEnemyHealthForLevel(currentLevel)
+				enemyDamage := getEnemyDamageForLevel(currentLevel)
+				n := NewEnemy(rl.NewVector2(100, 110), enemyHealth, enemyDamage, enemySize)
+
+				for respawn {
 					respawn = false
 					spawnPosition := RandomPointInCircle(200)
 					spawnPosition = rl.Vector2Add(spawnPosition, player.Pos)
-					
-					n = NewEnemy(rl.NewVector2(float32(spawnPosition.X), float32(spawnPosition.Y)), 100, 10, enemySize)
-					if n.pos.X < 100 || n.pos.Y < 100{
+
+					n = NewEnemy(rl.NewVector2(float32(spawnPosition.X), float32(spawnPosition.Y)), enemyHealth, enemyDamage, enemySize)
+					if n.pos.X < 100 || n.pos.Y < 100 {
 						respawn = true
 						continue
 					}
-					for _, e :=  range enemyList  {
-
-						if rl.CheckCollisionCircles(n.pos,enemySize, e.pos,  enemySize){
+					for _, e := range enemyList {
+						if rl.CheckCollisionCircles(n.pos, enemySize, e.pos, enemySize) {
 							respawn = true
 							break
 						}
 					}
 
-					if !respawn{	
+					if !respawn {
 						enemyList = append(enemyList, n)
 						worldItems = append(worldItems, n)
 						worldBodies = append(worldBodies, n)
+						enemiesRemaining--
+						enemiesInPlay++
 					}
 				}
 			}
@@ -184,9 +271,29 @@ func main() {
 					e.DealDamage(p.damage)
 					if e.health <= 0 {
 						e.destroyed = true
+						enemiesInPlay--
 					}
 					p.destroyed = true
 				}
+			}
+		}
+
+		// Check collision between enemies and player
+		for _, e := range enemyList {
+			if rl.CheckCollisionCircles(player.Pos, playerSize, e.pos, enemySize) {
+				// Apply damage to player based on enemy's damage stat
+				player.TakeDamage(e.damage)
+
+				// Simple invulnerability frame mechanic by slightly pushing enemy away
+				dir := rl.Vector2Subtract(e.pos, player.Pos)
+				if dir.X == 0 && dir.Y == 0 {
+					dir = rl.NewVector2(float32(rl.GetRandomValue(-10, 10))*0.1,
+						float32(rl.GetRandomValue(-10, 10))*0.1)
+				}
+				dir = rl.Vector2Normalize(dir)
+				pushDistance := float32(10.0) // Slight push
+				pushVector := rl.Vector2Scale(dir, pushDistance)
+				e.pos = rl.Vector2Add(e.pos, pushVector)
 			}
 		}
 
@@ -198,18 +305,31 @@ func main() {
 				x.Render()
 			}
 
-			/*
-				for _, r := range projList {
-					r.Render()
-				}
-
-				for _, r := range enemyList {
-					r.Render()
-				}
-			*/
-
 			player.Render()
 			rl.DrawFPS(10, 10)
+
+			// Draw player HP in the top-right corner of the screen
+			healthText := fmt.Sprintf("HP: %d/%d", player.CurrentHp, player.TotalHp)
+			textWidth := rl.MeasureText(healthText, 20)
+			rl.DrawText(healthText, int32(w)-textWidth-20, 20, 20, rl.White)
+
+			// Draw level information
+			levelText := fmt.Sprintf("Level: %d", currentLevel)
+			rl.DrawText(levelText, 10, 40, 20, rl.White)
+
+			enemiesText := fmt.Sprintf("Enemies remaining: %d", enemiesRemaining+len(enemyList))
+			rl.DrawText(enemiesText, 10, 70, 20, rl.White)
+
+			// Show level complete message
+			if levelCompleted {
+				levelCompleteText := fmt.Sprintf("LEVEL %d COMPLETE!", currentLevel-1)
+				completeTextWidth := rl.MeasureText(levelCompleteText, 40)
+				rl.DrawText(levelCompleteText, int32(w)/2-completeTextWidth/2, int32(h)/2-20, 40, rl.Yellow)
+
+				nextLevelText := fmt.Sprintf("NEXT LEVEL: %d", currentLevel)
+				nextLevelWidth := rl.MeasureText(nextLevelText, 30)
+				rl.DrawText(nextLevelText, int32(w)/2-nextLevelWidth/2, int32(h)/2+30, 30, rl.Green)
+			}
 		}
 		rl.EndDrawing()
 

@@ -33,39 +33,83 @@ func NewCollisionSpace(pw, ph, cols, rows int) (out CollisionSpace) {
 }
 
 func (cs *CollisionSpace) UpdateCells(bodies []Collides) {
+	// Clear the grid
 	for y := range cs.CollisionSpaceGrid {
 		for x := range cs.CollisionSpaceGrid[y] {
 			cs.CollisionSpaceGrid[y][x] = nil
 		}
 	}
 
+	// Place each body in the appropriate grid cell
 	for i, body := range bodies {
-		gy := ((int(body.Position().Y) / cs.CellHeight) % cs.Cols) + 1
-		gx := ((int(body.Position().X) / cs.CellWidth) % cs.Rows) + 1
+		pos := body.Position()
+
+		// Calculate grid coordinates, ensuring they stay within bounds
+		gx := int(pos.X / float32(cs.CellWidth))
+		gy := int(pos.Y / float32(cs.CellHeight))
+
+		// Apply bounds checking
+		if gx < 0 {
+			gx = 0
+		} else if gx >= cs.Cols {
+			gx = cs.Cols - 1
+		}
+
+		if gy < 0 {
+			gy = 0
+		} else if gy >= cs.Rows {
+			gy = cs.Rows - 1
+		}
+
+		// Add 1 for the border cells
+		gx += 1
+		gy += 1
+
+		// Add the body to the grid
 		cs.CollisionSpaceGrid[gy][gx] = append(cs.CollisionSpaceGrid[gy][gx], i)
 	}
 }
 
 func (cs *CollisionSpace) RearrangeBodies(maxIters int, collidables []Collides, each func()) {
-	collisions := []CollisionPair{}
-
 	anyColliding := true
-	for iters := 0; anyColliding && iters < MAX_COLLISION_ORDERING_ITERS; iters++ {
-		// Update space grid
+	for iters := 0; anyColliding && iters < maxIters; iters++ {
+		collisions := []CollisionPair{}
+
 		each()
 
 		for y := 1; y < cs.Rows; y++ {
 			for x := 1; x < cs.Cols; x++ {
 				central := cs.CollisionSpaceGrid[y][x]
+
+				if len(central) == 0 {
+					continue
+				}
+
 				for yy := y - 1; yy < y+2; yy++ {
 					for xx := x - 1; xx < x+2; xx++ {
+						if yy < 0 || yy >= len(cs.CollisionSpaceGrid) ||
+							xx < 0 || xx >= len(cs.CollisionSpaceGrid[yy]) {
+							continue
+						}
+
 						around := cs.CollisionSpaceGrid[yy][xx]
-						for _, enemyId := range central {
-							p := collidables[enemyId]
-							for _, nearbyEnemyId := range around {
-								pp := collidables[nearbyEnemyId]
-								if rl.CheckCollisionCircles(p.Position(), enemySize, pp.Position(), enemySize) && nearbyEnemyId != enemyId {
-									collisions = append(collisions, CollisionPair{p, pp})
+
+						if len(around) == 0 {
+							continue
+						}
+
+						for _, entityId := range central {
+							entity := collidables[entityId]
+
+							for _, nearbyEntityId := range around {
+								if nearbyEntityId == entityId {
+									continue
+								}
+
+								nearbyEntity := collidables[nearbyEntityId]
+
+								if entity.CheckCollision(nearbyEntity) {
+									collisions = append(collisions, CollisionPair{entity, nearbyEntity})
 								}
 							}
 						}

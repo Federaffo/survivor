@@ -65,11 +65,42 @@ func (e *Enemy) Rearrange(other Collides) {
 	case *Enemy:
 		enemy := other.(*Enemy)
 		dist := rl.Vector2Distance(e.pos, enemy.pos)
-		desiredDist := e.bodyRadius + enemy.bodyRadius
-		diff := desiredDist - dist
-		pToColliding := rl.Vector2Scale(rl.Vector2Normalize(rl.Vector2Subtract(enemy.pos, e.pos)), diff/2)
-		collidingToP := rl.Vector2Scale(rl.Vector2Normalize(rl.Vector2Subtract(e.pos, enemy.pos)), diff/2)
-		e.pos = rl.Vector2Add(e.pos, collidingToP)
-		enemy.pos = rl.Vector2Add(enemy.pos, pToColliding)
+
+		// Only rearrange if we're actually overlapping
+		if dist < e.bodyRadius+enemy.bodyRadius {
+			desiredDist := e.bodyRadius + enemy.bodyRadius
+
+			// Calculate overlap
+			overlap := desiredDist - dist
+
+			// Add a small random jitter to prevent perfect symmetry that can cause flickering
+			jitterX := float32(rl.GetRandomValue(-10, 10)) * 0.01
+			jitterY := float32(rl.GetRandomValue(-10, 10)) * 0.01
+			jitter := rl.NewVector2(jitterX, jitterY)
+
+			// Get direction vector from this enemy to the other
+			dir := rl.Vector2Subtract(enemy.pos, e.pos)
+			if dir.X == 0 && dir.Y == 0 {
+				// If objects are perfectly overlapping, push in a random direction
+				dir = rl.NewVector2(jitterX*10, jitterY*10)
+			}
+
+			// Normalize direction and apply dampening factor to make movement less aggressive
+			dir = rl.Vector2Normalize(dir)
+			dampening := float32(0.5) // Reduce the strength of the push
+
+			// Calculate movement vectors with dampening
+			moveAmount := overlap * dampening
+			pToColliding := rl.Vector2Scale(dir, moveAmount/2)
+			collidingToP := rl.Vector2Scale(rl.Vector2Negate(dir), moveAmount/2)
+
+			// Apply jitter to both objects
+			pToColliding = rl.Vector2Add(pToColliding, jitter)
+			collidingToP = rl.Vector2Add(collidingToP, rl.Vector2Negate(jitter))
+
+			// Move objects apart
+			e.pos = rl.Vector2Add(e.pos, collidingToP)
+			enemy.pos = rl.Vector2Add(enemy.pos, pToColliding)
+		}
 	}
 }

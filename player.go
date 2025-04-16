@@ -25,10 +25,10 @@ type weapon struct {
 
 var (
 	PISTOL weapon = weapon{shootingDelay: 0.5, projDamage: 50, nProj: 1}
-	MITRA  weapon = weapon{shootingDelay: 0.1, projDamage: 50, nProj: 1}
+	MITRA  weapon = weapon{shootingDelay: 0.1, projDamage: 500, nProj: 1}
 )
 
-var playerSpeed float32 = 200
+var playerSpeed float32 = 300
 
 func NewPlayer(totalHp int) player {
 	return player{
@@ -77,6 +77,29 @@ func (p *player) Render() {
 		rl.DrawRectanglePro(directionRectangle, rl.NewVector2(0, 1), rotation, rl.Green)
 	}
 	rl.DrawCircle(int32(p.Pos.X), int32(p.Pos.Y), playerSize, rl.Red)
+
+	// Draw health bar above player
+	healthBarWidth := playerSize * 2
+	healthBarHeight := 5.0
+	healthPercentage := float32(p.CurrentHp) / float32(p.TotalHp)
+
+	// Background of health bar
+	rl.DrawRectangle(
+		int32(p.Pos.X-healthBarWidth/2),
+		int32(p.Pos.Y-playerSize-10),
+		int32(healthBarWidth),
+		int32(healthBarHeight),
+		rl.DarkGray,
+	)
+
+	// Actual health
+	rl.DrawRectangle(
+		int32(p.Pos.X-healthBarWidth/2),
+		int32(p.Pos.Y-playerSize-10),
+		int32(healthBarWidth*healthPercentage),
+		int32(healthBarHeight),
+		rl.Red,
+	)
 }
 
 func (p *player) Shoot() []*Projectile {
@@ -91,4 +114,24 @@ func (p *player) Shoot() []*Projectile {
 
 func (p *player) Position() rl.Vector2 {
 	return p.Pos
+}
+
+func (p *player) TakeDamage(damage float32) {
+	p.CurrentHp -= int(damage)
+	if p.CurrentHp < 0 {
+		p.CurrentHp = 0
+	}
+}
+
+func (p *player) CheckCollision(other Collides) bool {
+	switch other.(type) {
+	case *Enemy:
+		enemy := other.(*Enemy)
+		return rl.CheckCollisionCircles(p.Pos, playerSize, enemy.pos, enemy.bodyRadius)
+	}
+	return false
+}
+
+func (p *player) Rearrange(other Collides) {
+	// Player doesn't need to rearrange since enemy collision will push the player back
 }
