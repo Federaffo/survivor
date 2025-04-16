@@ -54,14 +54,71 @@ func NewEnemy(pos rl.Vector2, maxHealth, damage, bodyRadius float32) *Enemy {
 	return &s
 }
 
-func (e *Enemy) Move(playerPos rl.Vector2, dt float64) {
+func (e *Enemy) Move(playerPos rl.Vector2, dt float64, blocks []*Block) {
 	dtspeed := dt * float64(enemySpeed)
 
+	// Store original position
+	originalPos := e.pos
+
+	// Calculate movement direction towards player
 	dir := rl.Vector2Subtract(playerPos, e.pos)
 	dir = rl.Vector2Normalize(dir)
 	dir = rl.Vector2Scale(dir, float32(dtspeed))
 
+	// Apply movement
 	e.pos = rl.Vector2Add(e.pos, dir)
+
+	// Check for collisions with blocks
+	enemyRect := rl.NewRectangle(e.pos.X-e.bodyRadius, e.pos.Y-e.bodyRadius, e.bodyRadius*2, e.bodyRadius*2)
+	for _, block := range blocks {
+		blockRect := rl.NewRectangle(block.pos.X, block.pos.Y, block.width, block.height)
+		if rl.CheckCollisionRecs(enemyRect, blockRect) {
+			// On collision, revert to original position
+			e.pos = originalPos
+
+			// Try to navigate around the block - implement basic pathfinding
+			// Try moving only horizontally
+			horizontalPos := originalPos
+			horizontalPos.X += dir.X
+
+			// Check if horizontal movement would cause collision
+			horizontalRect := rl.NewRectangle(horizontalPos.X-e.bodyRadius, horizontalPos.Y-e.bodyRadius, e.bodyRadius*2, e.bodyRadius*2)
+			horizontalCollision := false
+			for _, b := range blocks {
+				bRect := rl.NewRectangle(b.pos.X, b.pos.Y, b.width, b.height)
+				if rl.CheckCollisionRecs(horizontalRect, bRect) {
+					horizontalCollision = true
+					break
+				}
+			}
+
+			// Try moving only vertically
+			verticalPos := originalPos
+			verticalPos.Y += dir.Y
+
+			// Check if vertical movement would cause collision
+			verticalRect := rl.NewRectangle(verticalPos.X-e.bodyRadius, verticalPos.Y-e.bodyRadius, e.bodyRadius*2, e.bodyRadius*2)
+			verticalCollision := false
+			for _, b := range blocks {
+				bRect := rl.NewRectangle(b.pos.X, b.pos.Y, b.width, b.height)
+				if rl.CheckCollisionRecs(verticalRect, bRect) {
+					verticalCollision = true
+					break
+				}
+			}
+
+			// If horizontal movement is possible, do that
+			if !horizontalCollision {
+				e.pos = horizontalPos
+			} else if !verticalCollision {
+				// Otherwise try vertical movement
+				e.pos = verticalPos
+			}
+			// If both cause collisions, the enemy stays in place for this frame
+
+			break
+		}
+	}
 }
 
 func (e *Enemy) Position() rl.Vector2 {

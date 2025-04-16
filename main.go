@@ -143,6 +143,108 @@ func getWeaponName(w weapon) string {
 	return w.weaponName
 }
 
+type Block struct {
+	pos       rl.Vector2
+	width     float32
+	height    float32
+	color     rl.Color
+	destroyed bool
+}
+
+func NewBlock(x, y, width, height float32, color rl.Color) *Block {
+	return &Block{
+		pos:       rl.NewVector2(x, y),
+		width:     width,
+		height:    height,
+		color:     color,
+		destroyed: false,
+	}
+}
+
+func (b *Block) Render() {
+	rl.DrawRectangle(
+		int32(b.pos.X),
+		int32(b.pos.Y),
+		int32(b.width),
+		int32(b.height),
+		b.color,
+	)
+
+	// Draw border
+	borderColor := rl.Black
+	rl.DrawRectangleLines(
+		int32(b.pos.X),
+		int32(b.pos.Y),
+		int32(b.width),
+		int32(b.height),
+		borderColor,
+	)
+}
+
+func (b *Block) Destroyed() bool {
+	return b.destroyed
+}
+
+func (b *Block) GetRectangle() rl.Rectangle {
+	return rl.NewRectangle(b.pos.X, b.pos.Y, b.width, b.height)
+}
+
+type ImpactEffect struct {
+	pos         rl.Vector2
+	radius      float32
+	maxRadius   float32
+	color       rl.Color
+	lifeTime    float32
+	maxLifeTime float32
+	destroyed   bool
+}
+
+func NewImpactEffect(pos rl.Vector2, color rl.Color) *ImpactEffect {
+	return &ImpactEffect{
+		pos:         pos,
+		radius:      0,
+		maxRadius:   10.0,
+		color:       color,
+		lifeTime:    0,
+		maxLifeTime: 0.5, // half a second
+		destroyed:   false,
+	}
+}
+
+func (i *ImpactEffect) Update(dt float64) {
+	i.lifeTime += float32(dt)
+
+	// Calculate current radius based on lifetime
+	progress := i.lifeTime / i.maxLifeTime
+	if progress < 0.5 {
+		// Expanding phase
+		i.radius = i.maxRadius * (progress * 2)
+	} else {
+		// Shrinking phase
+		i.radius = i.maxRadius * (1.0 - (progress-0.5)*2)
+	}
+
+	// Destroy when lifetime is over
+	if i.lifeTime >= i.maxLifeTime {
+		i.destroyed = true
+	}
+}
+
+func (i *ImpactEffect) Render() {
+	// Calculate alpha based on lifetime
+	progress := i.lifeTime / i.maxLifeTime
+	alpha := float32(1.0 - progress)
+
+	// Draw circle with fade-out effect
+	color := i.color
+	color.A = uint8(255 * alpha)
+	rl.DrawCircle(int32(i.pos.X), int32(i.pos.Y), i.radius, color)
+}
+
+func (i *ImpactEffect) Destroyed() bool {
+	return i.destroyed
+}
+
 func main() {
 	display := rl.GetCurrentMonitor()
 
@@ -188,6 +290,8 @@ func main() {
 	var ammoLoots []*AmmoLoot
 	var grenadePickups []*GrenadePickup
 	var bloodList []*Blood
+	var blocks []*Block
+	var impacts []*ImpactEffect
 
 	// Level system variables
 	currentLevel := 1
@@ -226,13 +330,103 @@ func main() {
 	// Add player to worldBodies so it can be used for collisions
 	worldBodies = append(worldBodies, &player)
 
+	// Create some blocks for obstacles
+	// Center block
+	centerBlock := NewBlock(float32(w)/2-100, float32(h)/2-100, 200, 200, rl.DarkGray)
+	blocks = append(blocks, centerBlock)
+	worldItems = append(worldItems, centerBlock)
+
+	// Corner blocks
+	blocks = append(blocks, NewBlock(100, 100, 150, 150, rl.DarkGray))
+	blocks = append(blocks, NewBlock(float32(w)-250, 100, 150, 150, rl.DarkGray))
+	blocks = append(blocks, NewBlock(100, float32(h)-250, 150, 150, rl.DarkGray))
+	blocks = append(blocks, NewBlock(float32(w)-250, float32(h)-250, 150, 150, rl.DarkGray))
+
+	// Add corner blocks to world items for rendering
+	for i := 1; i < len(blocks); i++ {
+		worldItems = append(worldItems, blocks[i])
+	}
+
 	for !rl.WindowShouldClose() {
 		currentTime := rl.GetTime()
 		dt := currentTime - lastTime
 
 		mousePosition := rl.GetMousePosition()
 		player.LookAt(mousePosition)
-		player.Update(dt, currentTime)
+
+		// Process player movement and check for collisions with blocks
+		dtSpeed := playerSpeed * float32(dt)
+		moveDirection := rl.Vector2Zero()
+
+		if rl.IsKeyDown(rl.KeyA) {
+			moveDirection.X -= 1
+			player.facingLeft = true
+		}
+
+		if rl.IsKeyDown(rl.KeyD) {
+			moveDirection.X += 1
+			player.facingLeft = false
+		}
+
+		if rl.IsKeyDown(rl.KeyW) {
+			moveDirection.Y -= 1
+		}
+
+		if rl.IsKeyDown(rl.KeyS) {
+			moveDirection.Y += 1
+		}
+
+		// Normalize movement vector if moving diagonally
+		if moveDirection.X != 0 || moveDirection.Y != 0 {
+			moveDirection = rl.Vector2Normalize(moveDirection)
+
+			// Store current position before moving
+			oldPos := player.Pos
+
+			// Apply movement
+			player.Pos.X += moveDirection.X * dtSpeed
+			player.Pos.Y += moveDirection.Y * dtSpeed
+
+			// Calculate player's collision rectangle
+			// Adjust these values based on your player's visual size
+			playerHalfWidth := playerSize * 0.7
+			playerHalfHeight := playerSize * 0.7
+			playerRect := rl.NewRectangle(
+				player.Pos.X-playerHalfWidth,
+				player.Pos.Y-playerHalfHeight,
+				playerHalfWidth*2,
+				playerHalfHeight*2,
+			)
+
+			// Check for collisions with blocks
+			for _, block := range blocks {
+				if rl.CheckCollisionRecs(playerRect, block.GetRectangle()) {
+					// Collision detected - revert to previous position
+					player.Pos = oldPos
+					break
+				}
+			}
+
+			// Apply screen boundary constraints
+			screenWidth := float32(rl.GetScreenWidth())
+			screenHeight := float32(rl.GetScreenHeight())
+
+			if player.Pos.X < playerHalfWidth {
+				player.Pos.X = playerHalfWidth
+			}
+			if player.Pos.X > screenWidth-playerHalfWidth {
+				player.Pos.X = screenWidth - playerHalfWidth
+			}
+			if player.Pos.Y < playerHalfHeight {
+				player.Pos.Y = playerHalfHeight
+			}
+			if player.Pos.Y > screenHeight-playerHalfHeight {
+				player.Pos.Y = screenHeight - playerHalfHeight
+			}
+		}
+
+		// Only call the parts of Update that don't involve movement
+		player.UpdateWithoutMovement(dt, currentTime)
 
 		// Check if player is dead
 		if player.CurrentHp <= 0 {
@@ -259,11 +453,19 @@ func main() {
 				ammoLoots = make([]*AmmoLoot, 0)
 				grenadePickups = make([]*GrenadePickup, 0)
 				bloodList = make([]*Blood, 0)
+				impacts = make([]*ImpactEffect, 0)
 				currentLevel = 1
 				enemiesRemaining = getEnemiesForLevel(currentLevel)
 				enemiesInPlay = 0
 				levelCompleted = false
+
+				// Add player to worldBodies after reset
 				worldBodies = append(worldBodies, &player)
+
+				// Re-add all blocks to worldItems for rendering
+				for _, block := range blocks {
+					worldItems = append(worldItems, block)
+				}
 			}
 
 			lastTime = currentTime
@@ -445,6 +647,16 @@ func main() {
 					spawnPosition = rl.Vector2Add(spawnPosition, player.Pos)
 
 					n = NewEnemy(rl.NewVector2(float32(spawnPosition.X), float32(spawnPosition.Y)), enemyHealth, enemyDamage, enemySize)
+
+					// Check if enemy is inside a block
+					enemyRect := rl.NewRectangle(n.pos.X-enemySize, n.pos.Y-enemySize, enemySize*2, enemySize*2)
+					for _, block := range blocks {
+						if rl.CheckCollisionRecs(enemyRect, block.GetRectangle()) {
+							respawn = true
+							break
+						}
+					}
+
 					if n.pos.X < 100 || n.pos.Y < 100 {
 						respawn = true
 						continue
@@ -492,7 +704,7 @@ func main() {
 
 		// move enemy
 		for _, p := range enemyList {
-			p.Move(player.Pos, dt)
+			p.Move(player.Pos, dt, blocks)
 		}
 
 		// Spawn grenade pickups
@@ -538,6 +750,32 @@ func main() {
 		spaceGrid.RearrangeBodies(MAX_COLLISION_ORDERING_ITERS, worldBodies, func() {
 			spaceGrid.UpdateCells(worldBodies)
 		})
+
+		// Check for collisions between projectiles and blocks
+		for i := len(projList) - 1; i >= 0; i-- {
+			proj := projList[i]
+			// Create a small rectangle around the projectile for collision detection
+			projRect := rl.NewRectangle(
+				proj.pos.X-projSize/2,
+				proj.pos.Y-projSize/2,
+				projSize,
+				projSize,
+			)
+
+			// Check collision with each block
+			for _, block := range blocks {
+				if rl.CheckCollisionRecs(projRect, block.GetRectangle()) {
+					// Create impact effect
+					impact := NewImpactEffect(proj.pos, rl.Yellow)
+					impacts = append(impacts, impact)
+					worldItems = append(worldItems, impact)
+
+					// Projectile hit a block, destroy it
+					proj.destroyed = true
+					break
+				}
+			}
+		}
 
 		// check collision between proj and enemy
 		for _, p := range projList {
@@ -715,6 +953,12 @@ func main() {
 				blood.Update(dt)
 			}
 			bloodList = UpdateWorldItems(bloodList)
+
+			// Update impacts
+			for _, impact := range impacts {
+				impact.Update(dt)
+			}
+			impacts = UpdateWorldItems(impacts)
 		}
 		lastTime = currentTime
 	}

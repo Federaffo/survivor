@@ -89,7 +89,7 @@ func NewPlayer(totalHp int) player {
 	return player{
 		TotalHp:          totalHp,
 		CurrentHp:        totalHp,
-		Pos:              rl.NewVector2(200, 200),
+		Pos:              rl.NewVector2(500, 500),
 		lookAt:           rl.NewVector2(0, 0),
 		currentWeapon:    PISTOL,
 		lookAtSet:        false,
@@ -213,6 +213,42 @@ func (p *player) Update(dt float64, currentTime float64) {
 			p.facingLeft = false
 		}
 	}
+}
+
+// New method that handles everything in Update except for movement
+func (p *player) UpdateWithoutMovement(dt float64, currentTime float64) {
+	// Handle reload key press
+	if rl.IsKeyPressed(rl.KeyR) {
+		p.Reload(currentTime)
+	}
+
+	// Update reload progress
+	if p.isReloading {
+		// Check if reload is complete
+		if currentTime >= p.reloadStartTime+p.currentWeapon.reloadTime {
+			p.isReloading = false
+
+			// Calculate how many bullets to add to magazine
+			bulletsNeeded := p.currentWeapon.magazineSize - p.currentMagazine
+
+			if p.currentWeapon.usesAmmo {
+				// If we have enough ammo, add full magazine
+				if p.ammo >= bulletsNeeded {
+					p.ammo -= bulletsNeeded
+					p.currentMagazine = p.currentWeapon.magazineSize
+				} else {
+					// Otherwise add whatever we have left
+					p.currentMagazine += p.ammo
+					p.ammo = 0
+				}
+			} else {
+				// If weapon doesn't use ammo, just fill the magazine
+				p.currentMagazine = p.currentWeapon.magazineSize
+			}
+		}
+	}
+
+	// Note: Sprite direction logic is now handled in the main game loop
 }
 
 func (p *player) Render() {
