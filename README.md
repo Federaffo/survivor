@@ -35,18 +35,14 @@ Survivor is a 2D top-down shooter where you must fight off endless waves of zomb
 
 2. Build the game:
    ```
-   go build
+   make build
    ```
 
 3. Run the game:
    ```
-   ./survivor
+   make run
    ```
 
-Alternatively, you can use the provided Makefile:
-```
-make run
-```
 
 ## Controls
 
