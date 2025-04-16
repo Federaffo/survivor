@@ -95,7 +95,7 @@ func NewPlayer(totalHp int) player {
 		lookAtSet:        false,
 		weaponPickupName: "",
 		weaponPickupTime: 0,
-		ammo:             10000,
+		ammo:             50,
 		currentMagazine:  PISTOL.magazineSize, // Start with full magazine
 		isReloading:      false,
 		ammoPickupTime:   0,
