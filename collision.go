@@ -125,3 +125,12 @@ func (cs *CollisionSpace) RearrangeBodies(maxIters int, collidables []Collides, 
 		}
 	}
 }
+
+func (cs *CollisionSpace) Draw() {
+	for y := 0; y <= cs.Rows; y++ {
+		rl.DrawLine(0, int32(y*cs.CellHeight), int32(cs.Cols*cs.CellWidth), int32(y*cs.CellHeight), rl.Green)
+	}
+	for x := 0; x <= cs.Cols; x++ {
+		rl.DrawLine(int32(x*cs.CellWidth), 0, int32(x*cs.CellWidth), int32(cs.Rows*cs.CellHeight), rl.Green)
+	}
+}

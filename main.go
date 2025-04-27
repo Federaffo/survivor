@@ -8,8 +8,8 @@ import (
 
 const (
 	MAX_COLLISION_ORDERING_ITERS = 3
-	SPACE_GRID_WIDTH             = 70
-	SPACE_GRID_HEIGHT            = 70
+	SPACE_GRID_WIDTH             = 30
+	SPACE_GRID_HEIGHT            = 30
 )
 
 var (
@@ -400,6 +400,8 @@ func main() {
 	// Track game start time
 	gameStartTime := rl.GetTime()
 
+	var showGrid bool = false;
+
 	for !rl.WindowShouldClose() {
 		currentTime := rl.GetTime()
 		dt := currentTime - lastTime
@@ -407,6 +409,10 @@ func main() {
 		// Handle ESC key for game pause
 		if rl.IsKeyPressed(rl.KeyEscape) {
 			gamePaused = !gamePaused
+		}
+
+		if rl.IsKeyPressed(rl.KeyK) {
+			showGrid = !showGrid;
 		}
 
 		// Skip game logic updates when paused, but still handle input and rendering
@@ -1055,6 +1061,10 @@ func main() {
 			grenadeCountText := fmt.Sprintf("Grenades: %d", player.grenades)
 			grenadeCountWidth := rl.MeasureText(grenadeCountText, 20)
 			rl.DrawText(grenadeCountText, int32(w)-grenadeCountWidth-20, 170, 20, rl.White)
+
+			if showGrid {
+				spaceGrid.Draw();
+			}
 
 			// Show pause screen overlay when game is paused
 			if gamePaused {
